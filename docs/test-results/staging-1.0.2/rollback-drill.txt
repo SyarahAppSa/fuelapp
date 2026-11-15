@@ -1,0 +1,15 @@
+## 3b. Rollback drill with a release that cannot start (crashes at launch)
+data before: 149 trips, 912 users, 113 files, 3414200.00 meter sum
+[06:16:48] deploy 1.0.3-broken (previous: 1.0.2)
+[06:18:52] smoke: not ready: 
+[06:18:52] deploy 1.0.3-broken FAILED smoke test
+[06:18:52] rolling back to 1.0.2
+[06:18:57] rollback to 1.0.2 OK
+deploy exit code=2 after 129s
+running now: {"status":"ready","version":"1.0.2","checks":{"database":"ok","migrations":"ok","files":"ok","unhandledErrorsSinceStart":"0"}}
+data after:  149 trips, 912 users, 113 files, 3414200.00 meter sum
+PASS data unchanged by the failed release
+current version file: 1.0.2
+alerts:
+2026-11-15T06:15:56.520Z {"text":"[FuelUp monitor] الخادم غير جاهز: {"status":"not-ready","version":"1.0.2","checks":{"database":"unreachable: SocketException","files":"ok","unhandledErro
+2026-11-15T06:18:57.067Z {"text":"[FuelUp deploy] deploy 1.0.3-broken failed; automatically rolled back to 1.0.2"}

@@ -1,0 +1,12 @@
+PASS checksums match (files not altered since backup)
+PASS companies rows restored: 2 (backup recorded 2)
+PASS users rows restored: 7 (backup recorded 7)
+PASS trips rows restored: 9 (backup recorded 9)
+PASS meter_readings rows restored: 16 (backup recorded 16)
+PASS audit rows restored: 126 (backup recorded 126)
+PASS attachments rows restored: 1 (backup recorded 1)
+PASS row-level security still enabled on company tables (32)
+PASS append-only triggers present on audit and meter_readings
+PASS migration history present (1 migrations)
+PASS files + Data Protection keys archive readable (6 entries)
+RESTORE TEST PASSED

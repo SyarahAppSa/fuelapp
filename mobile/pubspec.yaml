@@ -1,0 +1,49 @@
+name: fuelup_driver
+description: تطبيق السائق — منظومة فيول آب
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  flutter_secure_storage: ^11.2.0
+  http: ^1.2.2
+  http_parser: ^4.0.2
+  image_picker: ^1.1.2
+  intl: any
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.4
+  image_picker_platform_interface: ^2.11.2
+  plugin_platform_interface: ^2.1.8
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/logo_full.png
+    - assets/logo_mark.png
+  fonts:
+    - family: Tajawal          # SIL Open Font License (assets/fonts/OFL.txt)
+      fonts:
+        - asset: assets/fonts/Tajawal-Regular.ttf
+        - asset: assets/fonts/Tajawal-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Tajawal-ExtraBold.ttf
+          weight: 800
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/logo_mark.png
+  remove_alpha_ios: true
+  background_color_ios: "#ffffff"
+  adaptive_icon_background: "#ffffff"
+  adaptive_icon_foreground: assets/logo_mark.png

@@ -1,0 +1,6 @@
+(node:30077) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+statuses 200 400 | للعداد قراءة تأسيسية مسجلة. لتغييرها استخدم «استبدال / تصفير».
+ledger readings 501000,500000,500000 last 501000 baselinePending true
+PASS concurrent loads on one meter: one accepted, one rejected
+PASS 30 simultaneous orders: 30 created, 30 distinct numbers (no errors)

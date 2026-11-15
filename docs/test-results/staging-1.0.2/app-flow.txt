@@ -1,0 +1,15 @@
+(node:399) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS prepared: driver account app.gcrs4, vehicle ت ط ب gcrs, meter APP-gcrs4 (baseline 50,000 approved), order FU-2611-0040
+DEFINES --dart-define=APP_USER=app.gcrs4 --dart-define=APP_PASS=App-Test-Route-gcrs49 --dart-define=TRIP_NO=FU-2611-0040
+(node:592) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS order FU-2611-0040 completed from the app → بانتظار الاعتماد
+PASS quantities sent by the app reached the system: loaded 4000, delivered 4000, receipt 4000
+PASS meter ledger updated from the app: 50000 → 50000 → 54000 → 54000 → 58000
+PASS the reading below the last approved one (typed in the app) was never recorded
+PASS photos taken in the app are attached to the operation (7 files: load-doc, meter-start, meter-end, seals, unload-meter-before, unload-meter-after, receipt)
+PASS all photos verified as JPEG and marked as fresh camera captures
+PASS every app step recorded in the audit trail: بدء التنفيذ واعتماد التحميل ← بدء الرحلة ← الوصول للتفريغ ← فحص الأختام وبدء التفريغ ← تسجيل التسليم
+PASS supervisor approves the operation from the office side
+PASS the driver received the order notification in the app inbox

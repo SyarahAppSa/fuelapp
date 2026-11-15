@@ -1,0 +1,85 @@
+# FuelUp — production-shaped stack.  Before the first start:
+#   1) cp .env.example .env   and fill every value (see the comments there; never commit .env)
+#   2) put the TLS certificate in deploy/certs/ (fullchain.pem + privkey.pem), or for a local test: sh deploy/gen-dev-cert.sh
+#   3) docker compose up -d --build
+# Only nginx is published (80 → redirect, 443 → HTTPS). The API and PostgreSQL stay on private networks.
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    # the API keeps at most DB_POOL_MAX connections (requests wait for a free one instead of failing); headroom for admin/backup
+    command: ["postgres", "-c", "max_connections=120", "-c", "shared_buffers=256MB"]
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?set POSTGRES_SUPERUSER_PASSWORD in .env}
+      FUELUP_OWNER_PASSWORD: ${DB_OWNER_PASSWORD:?set DB_OWNER_PASSWORD in .env}
+      FUELUP_APP_PASSWORD: ${DB_APP_PASSWORD:?set DB_APP_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./deploy/db-init:/docker-entrypoint-initdb.d:ro
+    networks: [backend]
+    logging: { driver: json-file, options: { max-size: "20m", max-file: "5" } }
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d fuelup"]
+      interval: 5s
+      retries: 20
+    security_opt: ["no-new-privileges:true"]
+
+  api:
+    image: ${IMAGE_PREFIX:-fuelup}/api:${FUELUP_VERSION:-local}     # every release is a tagged image: rollback = previous tag
+    build: ./backend
+    restart: unless-stopped
+    logging: { driver: json-file, options: { max-size: "20m", max-file: "10" } }
+    depends_on: { db: { condition: service_healthy } }
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      App__Version: ${FUELUP_VERSION:-local}
+      App__Environment: ${APP_ENVIRONMENT:-production}
+      ConnectionStrings__Default: Host=db;Database=fuelup;Username=fuelup_app;Password=${DB_APP_PASSWORD};Maximum Pool Size=${DB_POOL_MAX:-60};Timeout=15
+      ConnectionStrings__Migrations: Host=db;Database=fuelup;Username=fuelup_owner;Password=${DB_OWNER_PASSWORD};Maximum Pool Size=5
+      Database__AppRole: fuelup_app
+      Jwt__Key: ${JWT_KEY:?set JWT_KEY in .env (openssl rand -hex 32)}
+      Proxy__TrustedNetworks: 172.30.0.0/24
+      Cors__Origins__0: https://${PUBLIC_HOST:-localhost}
+      Files__Root: /data/files
+      DataProtection__KeysPath: /data/keys
+      Alerts__WebhookUrl: ${ALERT_WEBHOOK_URL:-}
+      Seed__Demo: ${SEED_DEMO:-false}
+      Seed__AllowInProduction: ${SEED_DEMO_ALLOW:-false}
+      Bootstrap__CompanyName: ${BOOTSTRAP_COMPANY:-}
+      Bootstrap__AdminUsername: ${BOOTSTRAP_ADMIN_USER:-}
+      Bootstrap__AdminPassword: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+      RateLimits__AuthPerMinute: ${AUTH_PER_MINUTE:-20}
+      RateLimits__ApiPerMinute: ${API_PER_MINUTE:-300}
+      RateLimits__ApiBurst: ${API_BURST:-120}
+    volumes:
+      - files:/data/files
+      - keys:/data/keys
+    networks: [backend, frontend]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+  web:
+    image: ${IMAGE_PREFIX:-fuelup}/web:${FUELUP_VERSION:-local}
+    build: ./web
+    restart: unless-stopped
+    logging: { driver: json-file, options: { max-size: "20m", max-file: "10" } }
+    depends_on: [api]
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/proxy_api.conf:/etc/nginx/proxy_api.conf:ro
+      - ./deploy/certs:/etc/nginx/certs:ro
+    networks: [frontend]
+    security_opt: ["no-new-privileges:true"]
+
+networks:
+  backend: { internal: true }          # no route to the internet; db reachable only by api
+  frontend:
+    ipam: { config: [{ subnet: 172.30.0.0/24 }] }
+
+volumes:
+  pgdata:
+  files:
+  keys:

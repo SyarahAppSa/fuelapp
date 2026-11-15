@@ -1,0 +1,16 @@
+(node:32011) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS web sign-in asks the admin for the second step
+PASS code field starts empty (no value carried over from the password step)
+PASS wrong code shows an error, no access
+PASS correct code opens the dashboard
+PASS no token in localStorage, sessionStorage or document.cookie (readable by scripts)
+PASS refresh cookie: HttpOnly, Secure, SameSite=Strict
+PASS page reload keeps the user signed in through the HttpOnly cookie (token re-issued, never stored)
+PASS XSS payloads in customer/site/reference rendered as plain text (no script ran)
+PASS hostile text visible literally in the table
+PASS Content-Security-Policy blocks inline scripts
+PASS security page lists sessions, users and security events
+PASS after logout the refresh cookie no longer works
+
+RESULT: 12 passed, 0 failed (CSP reports: 1)

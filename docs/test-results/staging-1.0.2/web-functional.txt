@@ -1,0 +1,32 @@
+PASS admin menu has «الرحلات»
+PASS admin menu has «الإسناد»
+PASS admin menu has «العدادات»
+PASS admin menu has «البيانات الأساسية»
+PASS admin menu has «المستخدمون والصلاحيات»
+PASS admin menu has «الأمان والجلسات»
+PASS station added from the web: تمت الإضافة.
+PASS new station listed
+PASS meter added: تمت الإضافة.
+PASS vehicle added with its meter: تمت الإضافة.
+PASS driver added: تمت الإضافة.
+PASS customer added: تمت الإضافة.
+PASS duplicate plate refused by the server and explained in Arabic
+PASS driver account created from the web: أُنشئ المستخدم. عند أول دخول لحسابات الإدارة سيُطلب تفعيل التحقق بخطوتين.
+PASS common password refused with a clear message
+PASS vehicle assigned to the driver: تم تحديث إسناد و ب ي b75t.
+PASS default driver set for the customer: تم تحديث السائق الافتراضي لـ عميل الويب b75t.
+PASS vehicle row now shows the assigned driver (saved on the server, not just a message)
+PASS customer row now shows its default driver
+PASS order created from the web, listed with the default driver
+(node:32425) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS driver app API lists the web-created order for that driver only
+PASS driver got the new-order notification
+PASS driver app shows the vehicle assigned on the web
+PASS order handed over to another driver from the drawer: نُقل الطلب، وسيؤكد السائق المستلم من التطبيق.
+PASS after the handover the first driver no longer sees the order
+PASS driver web menu shows only «الأمان والجلسات»
+PASS driver opening /users directly gets no data (server returns 403)
+PASS no JavaScript errors in the pages
+
+RESULT: 28 passed, 0 failed

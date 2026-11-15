@@ -1,0 +1,148 @@
+
+## 1. Unauthenticated and forged tokens
+PASS no token → 401 on /api/trips
+PASS no token → 401 on /api/users
+PASS no token → 401 on /api/me
+PASS no token → 401 on /api/master/vehicles
+PASS no token → 401 on /api/security/events
+PASS no token → 401 on /api/reports/fill-operations
+PASS admin had to enrol two-step verification at first sign-in (8 recovery codes issued)
+PASS access token: HS256, bound to a session (sid) and company (cid), lifetime ≤ 15 min
+PASS alg=none token rejected
+PASS tampered payload with original signature rejected
+PASS token signed with a guessed key rejected
+
+## 2. Sign-in: generic errors, two-step verification, replay, recovery codes
+PASS unknown user and wrong password give the same answer (no username enumeration)
+PASS correct password alone gives no access token to a management account
+PASS the intermediate MFA ticket cannot be used as an access token
+PASS enrolled admin: password step returns only an MFA ticket
+PASS wrong 6-digit code rejected
+PASS replay of an already used code rejected
+PASS one-time recovery code accepted once
+PASS same recovery code rejected the second time
+PASS passwords stored as bcrypt (cost 12): $2a$12$…
+PASS TOTP secret stored encrypted (Data Protection), not in clear
+
+## 3. Lockout after repeated failures
+PASS after 5 failures even the correct password is refused (temporary lockout)
+PASS lockout visible to the administrator
+PASS administrator lifts the lockout
+PASS driver2 can sign in after the lockout is lifted
+PASS user list never returns password hashes, MFA secrets or recovery codes
+
+## 4. Sessions: revoke, logout, disable, refresh-token theft
+PASS user sees his active sessions (3)
+PASS user ends a session on another device
+PASS revoked session: its unexpired access token stops working immediately
+PASS revoked session: its refresh token is refused
+PASS refresh token rotates (new one each time)
+PASS old refresh token replayed → refused
+PASS replay detected as theft → the whole session is revoked (attacker and victim must sign in again)
+PASS logout kills the access token at once
+
+## 5. Web client: refresh token only in an HttpOnly cookie, CSRF guard
+PASS web login: no refresh token in the JSON body (unreachable by scripts)
+PASS refresh cookie is HttpOnly, SameSite=Strict, scoped to /api/auth (Secure off: plain-HTTP dev)
+PASS cookie refresh without the X-FuelUp-Client header refused (cross-site request forgery guard)
+PASS cookie refresh with the header accepted
+
+## 6. Permissions on the server and object-level access (IDOR)
+PASS driver → 403 on GET /api/users
+PASS driver → 403 on GET /api/security/events
+PASS driver → 403 on POST /api/master/stations
+PASS driver → 403 on GET /api/assignments/vehicles
+PASS driver → 403 on POST /api/users
+PASS driver2 cannot open driver1's trip
+PASS driver2 cannot list driver1's trip attachments
+PASS driver2 cannot request a correction on driver1's trip (fixed IDOR)
+PASS driver2 cannot run steps of driver1's trip
+PASS admin creates a limited user manager
+PASS admin resets that user's password
+PASS admin edits that user's permissions
+PASS user manager cannot grant a level he does not hold (Ops:Edit)
+PASS user manager cannot create an Admin
+PASS user manager cannot edit an Admin account
+PASS only an Admin can reset two-step verification
+
+## 7. Mass assignment and input validation
+PASS client-sent id/companyId ignored (server sets them)
+PASS rejected: negative quantity
+PASS rejected: absurd quantity
+PASS rejected: over-long text
+PASS SQL-injection-like enum value rejected (400)
+PASS SQL-injection-like date rejected (400)
+PASS classic ' OR '1'='1 sign-in refused
+PASS hostile text stored literally as data (parameterised queries)
+PASS trips table intact after injection attempts
+PASS request body over 1 MB refused (413)
+
+## 8. File uploads
+PASS HTML disguised as .jpg with image/jpeg type rejected (content checked by signature)
+PASS SVG (can carry scripts) rejected
+PASS executable disguised as PDF rejected
+PASS file over 10 MB refused (413)
+PASS driver2 cannot attach files to driver1's trip
+PASS genuine JPEG accepted
+PASS download: server-detected type, nosniff, CSP sandbox
+PASS driver2 cannot download driver1's file by guessing its id
+PASS path-traversal file name neutralised: 
+
+## 9. Company isolation (application layer)
+PASS company B sees only its own trips (1)
+PASS company B cannot open company A's trip by id (404, not even 403)
+PASS company B's user list contains only its users
+PASS company A's customers invisible to company B
+PASS company B cannot assign company A's vehicle
+PASS company B cannot create a trip on company A's customer/station
+PASS company B cannot attach to company A's trip
+PASS company B cannot download company A's file
+PASS company B's security log has no company A events
+PASS same plate exists in both companies (uniqueness is per company)
+
+## 10. Company isolation and integrity in the database itself
+PASS runtime DB role without a company set: sees 0 trips (row-level security)
+PASS with company A set: 6 trips, none of company B — even with a hand-written query
+PASS moving rows to another company refused by the database (WITH CHECK)
+PASS inserting into another company's data refused by the database
+PASS runtime role cannot DELETE trips (no deletion of operations)
+PASS runtime role cannot UPDATE the audit log
+PASS runtime role cannot create tables (no DDL)
+PASS even the owner role cannot delete audit rows (append-only trigger)
+PASS meter ledger is append-only for every non-superuser role
+
+## 11. Excel export cannot carry formulas
+PASS formula-looking text exported as plain text (no executable cell formula)
+
+## 12. HTTP hardening
+PASS API answers carry nosniff, DENY framing, CSP, no-store
+PASS no Server header (stack not advertised)
+PASS CORS: foreign origin not allowed
+PASS malformed JSON → 400 without stack traces or internals
+
+## 13. Security log and alerts
+PASS security event recorded: login.failed
+PASS security event recorded: account.locked
+PASS security event recorded: mfa.failed
+PASS security event recorded: refresh.reuse
+PASS security event recorded: access.denied
+PASS security event recorded: upload.rejected
+PASS security event recorded: mfa.enrolled
+PASS security event recorded: permissions.changed
+PASS security event recorded: user.created
+PASS security event recorded: password.reset
+PASS security event recorded: session.revoked
+PASS security log contains no passwords, codes or secrets
+PASS administrators received in-app security alerts (4)
+
+## 14. Password rules
+PASS weak new password refused: too short
+PASS weak new password refused: common
+PASS weak new password refused: contains username
+PASS change refused without the current password
+
+## 15. Brute-force rate limit (per IP)
+PASS sign-in attempts throttled by API after 20 requests (spoofed X-Forwarded-For does not bypass it)
+PASS many failed sign-ins for unknown users from one IP raised a platform-level credential-stuffing alert
+
+RESULT: 116 passed, 0 failed

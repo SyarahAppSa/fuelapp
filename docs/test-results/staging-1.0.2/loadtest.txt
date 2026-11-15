@@ -1,0 +1,30 @@
+(node:20444) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+setup: 300 drivers…
+setup done: 300 signed-in drivers
+steady: 100 drivers + 20 office for 180s
+burst: 300 drivers + 20 office for 60s
+
+phase   request                         count errors    p50    p95    p99 (ms)
+steady  office: create order              100      0   1137   1259   1287
+steady  office: dashboard                1181      0     16     24    539
+steady  office: orders page              1181      0     13     20    313
+steady  driver: profile                  3570      0      9     17    290
+steady  office: fill report              1181      0     17     24    368
+steady  driver: my orders                3570      0     11     20    296
+steady  driver: notifications            3570      0      7     14    185
+steady  driver: load                      100      0    283    368    383
+steady  driver: depart                    100      0     16     31     40
+steady  driver: arrive                    100      0     15     22     55
+steady  driver: photo upload 150 KB       100      0     16     39     71
+steady  driver: unload                    100      0     14     22     25
+steady  driver: deliver                   100      0     20     32     38
+burst   driver: profile                  3638      2     10    670    834
+burst   office: dashboard                 396      0     18    635    729
+burst   driver: my orders                3638      0     13    561    634
+burst   driver: notifications            3638      0      9    371    463
+burst   office: orders page               396      0     15    502    626
+burst   office: fill report               396      0     20    300    481
+
+steady: 14953 requests, 80.3 req/s, errors 0
+burst:  12102 requests, 182.6 req/s, errors 2

@@ -1,0 +1,7 @@
+   Woah! You appear to be trying to run flutter as root.
+   We strongly recommend running the flutter tool without superuser privileges.
+  /
+📎
+00:00 +0: loading /tmp/claude-0/-home-user/8ddcc343-5d22-5a2b-8e94-43c3e5f5e3fb/scratchpad/fuelup-code/mobile/test/live/driver_flow_test.dart
+00:00 +0: driver completes an order in the app and the server records it
+00:14 +1: All tests passed!

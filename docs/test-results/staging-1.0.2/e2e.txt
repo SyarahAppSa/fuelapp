@@ -1,0 +1,31 @@
+(node:30039) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS login admin/supervisor/driver1
+PASS wrong password rejected
+PASS driver1 sees 1 assigned vehicle: ر ط أ 4821
+PASS driver cannot create orders (403)
+PASS default driver of customer auto-assigned: FU-2611-0002
+PASS driver lists only own orders (2)
+PASS vehicle not assigned to driver rejected
+PASS reading 124,900 below 125,000 rejected: لا يمكن اعتماد القراءة؛ القراءة المدخلة أقل من آخر قراءة معتمدة لهذا العداد وهي «125,000». يرجى التحقق من القراءة أو التواصل مع المشرف.
+PASS equal start/end rejected for positive quantity
+PASS load accepted, meter qty 3,000
+PASS cannot skip from Loaded to Arrived
+PASS unloading start below last reading rejected
+PASS clean match → awaiting approval (unsettled 0)
+PASS driver cannot approve
+PASS supervisor approves, approver recorded
+PASS difference → under review: فرق غير مسوّى +200 لتر، فرق العداد عن سند الاستلام -200 لتر
+PASS under-review trip cannot be plain-approved
+PASS resolved with written decision
+PASS handover reading below last rejected
+PASS handover recorded to driver2
+PASS receiving driver confirmed
+PASS driver2 notified: نُقل إليك الطلب FU-2611-0004. أكّد الاستلام من التطبيق.
+PASS driver cannot reset meter
+PASS supervisor reset with new serial
+PASS ledger kept full history (13 readings), last=0
+PASS fill report rows=3 flagged=1
+PASS excel export 7529 bytes
+PASS dashboard summary loaded=9000
+PASS audit trail entries: 8
