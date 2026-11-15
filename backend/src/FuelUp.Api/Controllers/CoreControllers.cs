@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 namespace FuelUp.Api.Controllers;
 
 [ApiController, Route("api/me"), Authorize]
-public class MeController(FuelUpDb db, ActorAccessor actor, AssignmentService assign) : ControllerBase
+public class MeController(FuelUpDb db, ActorAccessor actor) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> Get()
