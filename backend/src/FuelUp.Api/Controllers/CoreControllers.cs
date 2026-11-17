@@ -155,7 +155,8 @@ public class MetersController(FuelUpDb db, ActorAccessor actor, MeterLedger ledg
 public class AttachmentsController(FuelUpDb db, ActorAccessor actor, FileStore store, SecurityEvents events) : ControllerBase
 {
     public const long MaxBytes = 10 * 1024 * 1024;
-    private static readonly HashSet<string> Kinds = ["load-doc", "meter-start", "meter-end", "seals", "unload-meter-before", "unload-meter-after", "receipt", "baseline", "other"];
+    private static readonly HashSet<string> Kinds = ["load-doc", "meter-start", "meter-end", "seals", "unload-meter-before", "unload-meter-after", "receipt", "baseline", "other",
+        "part-photo", "invoice", "receipt-voucher", "work-order", "handover", "inspection"];
 
     /// <summary>
     /// Upload one photo or PDF for an operation. The server checks: the caller may act on that operation, size ≤ 10 MB,
@@ -163,7 +164,7 @@ public class AttachmentsController(FuelUpDb db, ActorAccessor actor, FileStore s
     /// The SHA-256 fingerprint flags a picture already used on another operation.
     /// </summary>
     [HttpPost, RequestSizeLimit(MaxBytes + 64 * 1024), RequestFormLimits(MultipartBodyLengthLimit = MaxBytes + 64 * 1024), EnableRateLimiting("upload")]
-    public async Task<IActionResult> Upload([FromForm] IFormFile file, [FromForm, Required, RegularExpression("^trip$")] string ownerType, [FromForm] Guid ownerId,
+    public async Task<IActionResult> Upload([FromForm] IFormFile file, [FromForm, Required, RegularExpression("^(trip|part|workorder|transfer)$")] string ownerType, [FromForm] Guid ownerId,
         [FromForm, Required, StringLength(40)] string kind, [FromForm] DateTimeOffset? capturedAt, [FromForm, Range(-90, 90)] double? lat, [FromForm, Range(-180, 180)] double? lng)
     {
         var a = await actor.GetAsync();
@@ -219,6 +220,20 @@ public class AttachmentsController(FuelUpDb db, ActorAccessor actor, FileStore s
         {
             var rep = await db.FillReports.Where(x => x.Id == ownerId).Select(x => new { x.DriverId }).FirstOrDefaultAsync() ?? throw new NotFoundException("التقرير");
             if (!(a.Can(Section.Driver, PermissionLevel.Edit) && a.DriverId == rep.DriverId) && !a.Can(Section.FillReports, write ? PermissionLevel.Edit : PermissionLevel.View)) throw new ForbiddenException();
+            return;
+        }
+        if (ownerType is "part" or "workorder" or "transfer")   // custody documents: part photo, invoice, receipt voucher, work order, signed hand-over
+        {
+            var exists = ownerType switch
+            {
+                "part" => await db.Parts.AnyAsync(x => x.Id == ownerId),
+                "workorder" => await db.WorkOrders.AnyAsync(x => x.Id == ownerId),
+                _ => await db.CustodyTransfers.AnyAsync(x => x.Id == ownerId),
+            };
+            if (!exists) throw new NotFoundException("السجل");
+            var ok = a.Can(Section.Custody, write ? PermissionLevel.Edit : PermissionLevel.View)
+                     || (ownerType == "workorder" && (write ? a.Can(Section.VehicleFile, PermissionLevel.Edit) && a.Can(Section.Custody) : a.Can(Section.VehicleFile)));
+            if (!ok) throw new ForbiddenException();
             return;
         }
         if (ownerType != "trip") throw new NotFoundException("العملية");

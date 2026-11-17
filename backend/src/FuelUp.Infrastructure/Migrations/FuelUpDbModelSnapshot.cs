@@ -284,6 +284,137 @@ namespace FuelUp.Infrastructure.Migrations
                     b.ToTable("companies", (string)null);
                 });
 
+            modelBuilder.Entity("FuelUp.Domain.CustodyTransfer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CatalogId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("catalog_id");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("Condition")
+                        .HasColumnType("text")
+                        .HasColumnName("condition");
+
+                    b.Property<DateTimeOffset?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_at");
+
+                    b.Property<Guid?>("DecidedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("decided_by");
+
+                    b.Property<string>("DecisionNote")
+                        .HasColumnType("text")
+                        .HasColumnName("decision_note");
+
+                    b.Property<Guid>("FromId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("from_id");
+
+                    b.Property<string>("FromKind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("from_kind");
+
+                    b.Property<string>("FromName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("from_name");
+
+                    b.Property<string>("HandoverBy")
+                        .HasColumnType("text")
+                        .HasColumnName("handover_by");
+
+                    b.Property<string>("HandoverNote")
+                        .HasColumnType("text")
+                        .HasColumnName("handover_note");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<decimal?>("Km")
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("km");
+
+                    b.Property<string>("No")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("no");
+
+                    b.Property<Guid?>("PartId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("part_id");
+
+                    b.Property<string>("Position")
+                        .HasColumnType("text")
+                        .HasColumnName("position");
+
+                    b.Property<decimal>("Qty")
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("qty");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("text")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_at");
+
+                    b.Property<Guid>("RequestedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("requested_by");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("ToId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("to_id");
+
+                    b.Property<string>("ToKind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("to_kind");
+
+                    b.Property<string>("ToName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("to_name");
+
+                    b.Property<Guid?>("WorkOrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("work_order_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_custody_transfers");
+
+                    b.HasIndex("PartId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_custody_transfers_pending_part")
+                        .HasFilter("status = 'Pending' AND part_id IS NOT NULL");
+
+                    b.HasIndex("CompanyId", "No")
+                        .IsUnique()
+                        .HasDatabaseName("ix_custody_transfers_company_id_no");
+
+                    b.HasIndex("ToKind", "ToId", "Status")
+                        .HasDatabaseName("ix_custody_transfers_to_kind_to_id_status");
+
+                    b.ToTable("custody_transfers", (string)null);
+                });
+
             modelBuilder.Entity("FuelUp.Domain.Customer", b =>
                 {
                     b.Property<Guid>("Id")
@@ -453,10 +584,18 @@ namespace FuelUp.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("emp_no");
 
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("name");
+
+                    b.Property<string>("Phone")
+                        .HasColumnType("text")
+                        .HasColumnName("phone");
 
                     b.Property<string>("Role")
                         .HasColumnType("text")
@@ -677,6 +816,46 @@ namespace FuelUp.Infrastructure.Migrations
                         .HasDatabaseName("ix_gps_points_vehicle_id_at");
 
                     b.ToTable("gps_points", (string)null);
+                });
+
+            modelBuilder.Entity("FuelUp.Domain.HolderBalance", b =>
+                {
+                    b.Property<string>("HolderKind")
+                        .HasColumnType("text")
+                        .HasColumnName("holder_kind");
+
+                    b.Property<Guid>("HolderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("holder_id");
+
+                    b.Property<Guid>("CatalogId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("catalog_id");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("HolderName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("holder_name");
+
+                    b.Property<decimal>("Qty")
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("qty");
+
+                    b.Property<DateTimeOffset>("Since")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("since");
+
+                    b.HasKey("HolderKind", "HolderId", "CatalogId")
+                        .HasName("pk_holder_balances");
+
+                    b.ToTable("holder_balances", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_holder_balances_qty", "qty >= 0");
+                        });
                 });
 
             modelBuilder.Entity("FuelUp.Domain.Meter", b =>
@@ -930,6 +1109,14 @@ namespace FuelUp.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("BatchNo")
+                        .HasColumnType("text")
+                        .HasColumnName("batch_no");
+
+                    b.Property<string>("Bin")
+                        .HasColumnType("text")
+                        .HasColumnName("bin");
+
                     b.Property<string>("Brand")
                         .HasColumnType("text")
                         .HasColumnName("brand");
@@ -938,17 +1125,57 @@ namespace FuelUp.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("catalog_id");
 
+                    b.Property<DateTimeOffset?>("ClaimOpenedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("claim_opened_at");
+
+                    b.Property<string>("ClaimRef")
+                        .HasColumnType("text")
+                        .HasColumnName("claim_ref");
+
+                    b.Property<string>("ClaimResult")
+                        .HasColumnType("text")
+                        .HasColumnName("claim_result");
+
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid")
                         .HasColumnName("company_id");
+
+                    b.Property<string>("Condition")
+                        .HasColumnType("text")
+                        .HasColumnName("condition");
 
                     b.Property<decimal?>("Cost")
                         .HasColumnType("numeric(14,2)")
                         .HasColumnName("cost");
 
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateOnly?>("ExpiryDate")
+                        .HasColumnType("date")
+                        .HasColumnName("expiry_date");
+
+                    b.Property<Guid?>("HolderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("holder_id");
+
+                    b.Property<string>("HolderKind")
+                        .HasColumnType("text")
+                        .HasColumnName("holder_kind");
+
                     b.Property<string>("HolderRef")
                         .HasColumnType("text")
                         .HasColumnName("holder_ref");
+
+                    b.Property<DateTimeOffset?>("HolderSince")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("holder_since");
+
+                    b.Property<decimal?>("InstallHours")
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("install_hours");
 
                     b.Property<decimal?>("InstallKm")
                         .HasColumnType("numeric(14,2)")
@@ -967,9 +1194,29 @@ namespace FuelUp.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("invoice_no");
 
+                    b.Property<DateOnly?>("LastInspection")
+                        .HasColumnType("date")
+                        .HasColumnName("last_inspection");
+
+                    b.Property<string>("LastLocation")
+                        .HasColumnType("text")
+                        .HasColumnName("last_location");
+
+                    b.Property<Guid?>("MeterId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("meter_id");
+
                     b.Property<string>("Model")
                         .HasColumnType("text")
                         .HasColumnName("model");
+
+                    b.Property<DateOnly?>("NextInspection")
+                        .HasColumnType("date")
+                        .HasColumnName("next_inspection");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text")
+                        .HasColumnName("notes");
 
                     b.Property<string>("Position")
                         .HasColumnType("text")
@@ -979,14 +1226,50 @@ namespace FuelUp.Infrastructure.Migrations
                         .HasColumnType("date")
                         .HasColumnName("purchase_date");
 
+                    b.Property<decimal?>("RepairCost")
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("repair_cost");
+
+                    b.Property<DateOnly?>("RepairExpectedAt")
+                        .HasColumnType("date")
+                        .HasColumnName("repair_expected_at");
+
+                    b.Property<DateTimeOffset?>("RepairSentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("repair_sent_at");
+
+                    b.Property<string>("RepairVendor")
+                        .HasColumnType("text")
+                        .HasColumnName("repair_vendor");
+
+                    b.Property<string>("ReviewOutcome")
+                        .HasColumnType("text")
+                        .HasColumnName("review_outcome");
+
+                    b.Property<Guid?>("ScrapApprovedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scrap_approved_by");
+
                     b.Property<string>("Serial")
                         .HasColumnType("text")
                         .HasColumnName("serial");
+
+                    b.Property<string>("SerialKey")
+                        .HasColumnType("text")
+                        .HasColumnName("serial_key");
+
+                    b.Property<string>("Specs")
+                        .HasColumnType("text")
+                        .HasColumnName("specs");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("status");
+
+                    b.Property<string>("StatusReason")
+                        .HasColumnType("text")
+                        .HasColumnName("status_reason");
 
                     b.Property<string>("Supplier")
                         .HasColumnType("text")
@@ -1004,24 +1287,44 @@ namespace FuelUp.Infrastructure.Migrations
                         .HasColumnType("date")
                         .HasColumnName("warranty_end");
 
+                    b.Property<DateOnly?>("WarrantyStart")
+                        .HasColumnType("date")
+                        .HasColumnName("warranty_start");
+
+                    b.Property<string>("WarrantyTerms")
+                        .HasColumnType("text")
+                        .HasColumnName("warranty_terms");
+
                     b.HasKey("Id")
                         .HasName("pk_parts");
+
+                    b.HasIndex("Serial")
+                        .HasDatabaseName("ix_parts_serial");
 
                     b.HasIndex("CompanyId", "InternalNo")
                         .IsUnique()
                         .HasDatabaseName("ix_parts_company_id_internal_no");
+
+                    b.HasIndex("CompanyId", "SerialKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_parts_serial_key")
+                        .HasFilter("serial_key IS NOT NULL");
+
+                    b.HasIndex("CompanyId", "Status")
+                        .HasDatabaseName("ix_parts_company_id_status");
+
+                    b.HasIndex("HolderKind", "HolderId")
+                        .HasDatabaseName("ix_parts_holder_kind_holder_id");
 
                     b.HasIndex("VehicleId", "Position")
                         .IsUnique()
                         .HasDatabaseName("ix_parts_vehicle_id_position")
                         .HasFilter("status = 'Installed' AND position IS NOT NULL");
 
-                    b.HasIndex("CompanyId", "Brand", "Serial")
-                        .IsUnique()
-                        .HasDatabaseName("ix_parts_company_id_brand_serial")
-                        .HasFilter("serial IS NOT NULL");
-
-                    b.ToTable("parts", (string)null);
+                    b.ToTable("parts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_parts_installed_vehicle", "(status = 'Installed') = (vehicle_id IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("FuelUp.Domain.PartCatalog", b =>
@@ -1052,6 +1355,10 @@ namespace FuelUp.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("inspect_every_days");
 
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
                     b.Property<string>("MfrPartNo")
                         .HasColumnType("text")
                         .HasColumnName("mfr_part_no");
@@ -1073,6 +1380,10 @@ namespace FuelUp.Infrastructure.Migrations
                         .HasColumnType("numeric(14,2)")
                         .HasColumnName("reorder_qty");
 
+                    b.Property<string>("Specs")
+                        .HasColumnType("text")
+                        .HasColumnName("specs");
+
                     b.Property<string>("Tracking")
                         .IsRequired()
                         .HasColumnType("text")
@@ -1081,6 +1392,10 @@ namespace FuelUp.Infrastructure.Migrations
                     b.Property<string>("Unit")
                         .HasColumnType("text")
                         .HasColumnName("unit");
+
+                    b.Property<decimal?>("UnitCost")
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("unit_cost");
 
                     b.HasKey("Id")
                         .HasName("pk_part_catalog");
@@ -1098,9 +1413,17 @@ namespace FuelUp.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<Guid?>("ApprovedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approved_by");
+
                     b.Property<DateTimeOffset>("At")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("at");
+
+                    b.Property<string>("BatchNo")
+                        .HasColumnType("text")
+                        .HasColumnName("batch_no");
 
                     b.Property<Guid>("ByUserId")
                         .HasColumnType("uuid")
@@ -1114,13 +1437,65 @@ namespace FuelUp.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("company_id");
 
+                    b.Property<Guid?>("CorrectsId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("corrects_id");
+
+                    b.Property<decimal?>("Cost")
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("cost");
+
+                    b.Property<string>("DocRef")
+                        .HasColumnType("text")
+                        .HasColumnName("doc_ref");
+
+                    b.Property<DateOnly?>("ExpectedReturn")
+                        .HasColumnType("date")
+                        .HasColumnName("expected_return");
+
+                    b.Property<Guid?>("FromHolderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("from_holder_id");
+
+                    b.Property<string>("FromHolderKind")
+                        .HasColumnType("text")
+                        .HasColumnName("from_holder_kind");
+
+                    b.Property<string>("FromHolderRef")
+                        .HasColumnType("text")
+                        .HasColumnName("from_holder_ref");
+
+                    b.Property<Guid?>("FromVehicleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("from_vehicle_id");
+
+                    b.Property<Guid?>("FromWarehouseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("from_warehouse_id");
+
+                    b.Property<Guid?>("HolderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("holder_id");
+
+                    b.Property<string>("HolderKind")
+                        .HasColumnType("text")
+                        .HasColumnName("holder_kind");
+
                     b.Property<string>("HolderRef")
                         .HasColumnType("text")
                         .HasColumnName("holder_ref");
 
+                    b.Property<decimal?>("Hours")
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("hours");
+
                     b.Property<decimal?>("Km")
                         .HasColumnType("numeric(14,2)")
                         .HasColumnName("km");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("note");
 
                     b.Property<string>("OldPartFate")
                         .HasColumnType("text")
@@ -1130,6 +1505,10 @@ namespace FuelUp.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("part_id");
 
+                    b.Property<string>("Position")
+                        .HasColumnType("text")
+                        .HasColumnName("position");
+
                     b.Property<decimal>("Qty")
                         .HasColumnType("numeric(14,2)")
                         .HasColumnName("qty");
@@ -1138,14 +1517,42 @@ namespace FuelUp.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("reason");
 
+                    b.Property<Guid?>("RelatedPartId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("related_part_id");
+
+                    b.Property<string>("StatusAfter")
+                        .HasColumnType("text")
+                        .HasColumnName("status_after");
+
+                    b.Property<string>("StatusBefore")
+                        .HasColumnType("text")
+                        .HasColumnName("status_before");
+
+                    b.Property<Guid?>("ToWarehouseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("to_warehouse_id");
+
+                    b.Property<Guid?>("TransferId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("transfer_id");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("type");
 
+                    b.Property<decimal?>("UnitCost")
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("unit_cost");
+
                     b.Property<Guid?>("VehicleId")
                         .HasColumnType("uuid")
                         .HasColumnName("vehicle_id");
+
+                    b.Property<string>("Vendor")
+                        .HasColumnType("text")
+                        .HasColumnName("vendor");
 
                     b.Property<Guid?>("WorkOrderId")
                         .HasColumnType("uuid")
@@ -1154,8 +1561,17 @@ namespace FuelUp.Infrastructure.Migrations
                     b.HasKey("Id")
                         .HasName("pk_part_movements");
 
+                    b.HasIndex("WorkOrderId")
+                        .HasDatabaseName("ix_part_movements_work_order_id");
+
                     b.HasIndex("PartId", "At")
                         .HasDatabaseName("ix_part_movements_part_id_at");
+
+                    b.HasIndex("VehicleId", "At")
+                        .HasDatabaseName("ix_part_movements_vehicle_id_at");
+
+                    b.HasIndex("CompanyId", "Type", "At")
+                        .HasDatabaseName("ix_part_movements_company_id_type_at");
 
                     b.ToTable("part_movements", (string)null);
                 });
@@ -1281,6 +1697,10 @@ namespace FuelUp.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("warehouse_id");
 
+                    b.Property<string>("Bin")
+                        .HasColumnType("text")
+                        .HasColumnName("bin");
+
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid")
                         .HasColumnName("company_id");
@@ -1292,7 +1712,66 @@ namespace FuelUp.Infrastructure.Migrations
                     b.HasKey("CatalogId", "WarehouseId")
                         .HasName("pk_stock_balances");
 
-                    b.ToTable("stock_balances", (string)null);
+                    b.ToTable("stock_balances", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_stock_balances_qty", "qty >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("FuelUp.Domain.StockCount", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("At")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("at");
+
+                    b.Property<Guid>("ByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("by_user_id");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("Lines")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("lines");
+
+                    b.Property<string>("MissingParts")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("missing_parts");
+
+                    b.Property<string>("No")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("no");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("note");
+
+                    b.Property<string>("UnexpectedParts")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("unexpected_parts");
+
+                    b.Property<Guid>("WarehouseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("warehouse_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_stock_counts");
+
+                    b.HasIndex("CompanyId", "No")
+                        .IsUnique()
+                        .HasDatabaseName("ix_stock_counts_company_id_no");
+
+                    b.ToTable("stock_counts", (string)null);
                 });
 
             modelBuilder.Entity("FuelUp.Domain.Trip", b =>
@@ -2202,6 +2681,18 @@ namespace FuelUp.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("company_id");
 
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Keeper")
+                        .HasColumnType("text")
+                        .HasColumnName("keeper");
+
+                    b.Property<string>("Location")
+                        .HasColumnType("text")
+                        .HasColumnName("location");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text")
@@ -2219,9 +2710,21 @@ namespace FuelUp.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("CloseNote")
+                        .HasColumnType("text")
+                        .HasColumnName("close_note");
+
                     b.Property<bool>("Closed")
                         .HasColumnType("boolean")
                         .HasColumnName("closed");
+
+                    b.Property<DateTimeOffset?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("closed_at");
+
+                    b.Property<Guid?>("ClosedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("closed_by");
 
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid")
@@ -2231,6 +2734,14 @@ namespace FuelUp.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("description");
+
+                    b.Property<Guid?>("DriverId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("driver_id");
+
+                    b.Property<decimal?>("Km")
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("km");
 
                     b.Property<decimal?>("LaborCost")
                         .HasColumnType("numeric(14,2)")
@@ -2245,6 +2756,10 @@ namespace FuelUp.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("opened_at");
 
+                    b.Property<Guid?>("OpenedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("opened_by");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasColumnType("text")
@@ -2254,8 +2769,15 @@ namespace FuelUp.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("vehicle_id");
 
+                    b.Property<string>("Workshop")
+                        .HasColumnType("text")
+                        .HasColumnName("workshop");
+
                     b.HasKey("Id")
                         .HasName("pk_work_orders");
+
+                    b.HasIndex("VehicleId")
+                        .HasDatabaseName("ix_work_orders_vehicle_id");
 
                     b.HasIndex("CompanyId", "No")
                         .IsUnique()

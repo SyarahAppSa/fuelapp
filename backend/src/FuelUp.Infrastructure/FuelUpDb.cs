@@ -49,6 +49,9 @@ public class FuelUpDb(DbContextOptions<FuelUpDb> options, TenantContext? tenant 
     public DbSet<StockBalance> StockBalances => Set<StockBalance>();
     public DbSet<PartMovement> PartMovements => Set<PartMovement>();
     public DbSet<WorkOrder> WorkOrders => Set<WorkOrder>();
+    public DbSet<HolderBalance> HolderBalances => Set<HolderBalance>();
+    public DbSet<CustodyTransfer> CustodyTransfers => Set<CustodyTransfer>();
+    public DbSet<StockCount> StockCounts => Set<StockCount>();
     public DbSet<TripCounter> TripCounters => Set<TripCounter>();
     public DbSet<AttendanceRecord> Attendance => Set<AttendanceRecord>();
     public DbSet<FillReport> FillReports => Set<FillReport>();
@@ -111,13 +114,28 @@ public class FuelUpDb(DbContextOptions<FuelUpDb> options, TenantContext? tenant 
         b.Entity<Part>(e =>
         {
             e.HasIndex(x => new { x.CompanyId, x.InternalNo }).IsUnique();
-            e.HasIndex(x => new { x.CompanyId, x.Brand, x.Serial }).IsUnique().HasFilter("serial IS NOT NULL");          // same serial from the same maker
+            // the same factory serial from the same maker can exist only once (MAKER|SERIAL, normalised by the API)
+            e.HasIndex(x => new { x.CompanyId, x.SerialKey }).IsUnique().HasFilter("serial_key IS NOT NULL").HasDatabaseName("ux_parts_serial_key");
             e.HasIndex(x => new { x.VehicleId, x.Position }).IsUnique().HasFilter("status = 'Installed' AND position IS NOT NULL"); // one part per position
+            // an installed part sits on exactly one truck; a part on a truck must be "Installed"
+            e.ToTable(t => t.HasCheckConstraint("ck_parts_installed_vehicle", "(status = 'Installed') = (vehicle_id IS NOT NULL)"));
+            e.HasIndex(x => new { x.CompanyId, x.Status });
+            e.HasIndex(x => new { x.HolderKind, x.HolderId });
+            e.HasIndex(x => x.Serial);
             e.Property(x => x.Status).HasConversion<string>();
         });
-        b.Entity<StockBalance>().HasKey(x => new { x.CatalogId, x.WarehouseId });
-        b.Entity<PartMovement>().HasIndex(x => new { x.PartId, x.At });
-        b.Entity<WorkOrder>().HasIndex(x => new { x.CompanyId, x.No }).IsUnique();
+        b.Entity<StockBalance>(e => { e.HasKey(x => new { x.CatalogId, x.WarehouseId }); e.ToTable(t => t.HasCheckConstraint("ck_stock_balances_qty", "qty >= 0")); });
+        b.Entity<HolderBalance>(e => { e.ToTable("holder_balances", t => t.HasCheckConstraint("ck_holder_balances_qty", "qty >= 0")); e.HasKey(x => new { x.HolderKind, x.HolderId, x.CatalogId }); });
+        b.Entity<PartMovement>(e => { e.HasIndex(x => new { x.PartId, x.At }); e.HasIndex(x => new { x.CompanyId, x.Type, x.At }); e.HasIndex(x => new { x.VehicleId, x.At }); e.HasIndex(x => x.WorkOrderId); });
+        b.Entity<CustodyTransfer>(e =>
+        {
+            e.ToTable("custody_transfers");
+            e.HasIndex(x => new { x.CompanyId, x.No }).IsUnique();
+            e.HasIndex(x => x.PartId).IsUnique().HasFilter("status = 'Pending' AND part_id IS NOT NULL").HasDatabaseName("ux_custody_transfers_pending_part");
+            e.HasIndex(x => new { x.ToKind, x.ToId, x.Status });
+        });
+        b.Entity<StockCount>(e => { e.ToTable("stock_counts"); e.HasIndex(x => new { x.CompanyId, x.No }).IsUnique(); Json(e.Property(x => x.Lines)); Json(e.Property(x => x.MissingParts)); Json(e.Property(x => x.UnexpectedParts)); });
+        b.Entity<WorkOrder>(e => { e.HasIndex(x => new { x.CompanyId, x.No }).IsUnique(); e.HasIndex(x => x.VehicleId); });
         // one open period per user at a time (enforced by the database, so two quick taps cannot open two)
         b.Entity<AttendanceRecord>(e => { e.ToTable("attendance"); e.HasIndex(x => x.UserId).IsUnique().HasFilter("check_out_at IS NULL").HasDatabaseName("ux_attendance_open"); e.HasIndex(x => new { x.CompanyId, x.Day }); });
         b.Entity<FillReport>(e =>

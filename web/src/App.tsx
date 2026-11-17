@@ -13,6 +13,11 @@ import Users from './pages/Users'
 import Meters from './pages/Meters'
 import Attendance from './pages/Attendance'
 import FillReports from './pages/FillReports'
+import Custody from './pages/Custody'
+import PartView from './pages/PartView'
+import TruckFile from './pages/TruckFile'
+import PartLabels from './pages/PartLabels'
+import MyCustody from './pages/MyCustody'
 
 export function useMe() {
   return useQuery({ queryKey: ['me'], queryFn: () => api<Me>('/api/me'), staleTime: 60_000, retry: false })
@@ -108,6 +113,8 @@ function Layout() {
     { to: '/fill-reports', label: 'تقارير التعبئة', show: can(me, 'FillReports') },
     { to: '/fill-report', label: 'تقرير الكميات والعمليات', show: can(me, 'Moves') },
     { to: '/attendance', label: 'الحضور والانصراف', show: true },
+    { to: '/custody', label: 'العُهد وقطع الغيار', show: can(me, 'Custody') },
+    { to: '/my-custody', label: 'عهدتي', show: !!me?.driverId },
     { to: '/assign', label: 'الإسناد', show: can(me, 'Assign') },
     { to: '/meters', label: 'العدادات', show: can(me, 'Meters') },
     { to: '/master', label: 'البيانات الأساسية', show: can(me, 'Master') },
@@ -118,7 +125,7 @@ function Layout() {
     <div className="app">
       <aside className="side" aria-label="القائمة الرئيسية">
         <div className="side-brand"><img src="/logo_mark.png" alt="" /><div><b>فيول آب</b><small>FULL APP</small></div></div>
-        <nav>{links.filter(l => l.show).map(l => <NavLink key={l.to} to={l.to} end>{l.label}</NavLink>)}</nav>
+        <nav>{links.filter(l => l.show).map(l => <NavLink key={l.to} to={l.to} end={l.to !== '/custody'}>{l.label}</NavLink>)}</nav>
       </aside>
       <div className="shell">
         <header className="topbar">
@@ -128,7 +135,7 @@ function Layout() {
           </div>
         </header>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/" element={!can(me, 'Ops') && can(me, 'Custody') ? <Navigate to="/custody" replace /> : <Dashboard />} />
           <Route path="/trips" element={<Trips />} />
           <Route path="/fill-report" element={<FillReport />} />
           <Route path="/security" element={<Security />} />
@@ -138,6 +145,11 @@ function Layout() {
           <Route path="/meters" element={<Meters />} />
           <Route path="/master" element={<MasterData />} />
           <Route path="/users" element={<Users />} />
+          <Route path="/custody" element={<Custody />} />
+          <Route path="/custody/part/:id" element={<PartView />} />
+          <Route path="/custody/truck/:id" element={<TruckFile />} />
+          <Route path="/custody/labels" element={<PartLabels />} />
+          <Route path="/my-custody" element={<MyCustody />} />
         </Routes>
       </div>
     </div>

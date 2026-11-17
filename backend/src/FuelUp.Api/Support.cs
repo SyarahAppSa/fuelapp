@@ -78,6 +78,9 @@ public class ErrorFilter(SecurityEvents events) : IAsyncExceptionFilter
             TenantViolationException => (403, "ليست لديك صلاحية لهذا الإجراء."),
             DbUpdateException { InnerException: PostgresException { SqlState: "42501" } } => (403, "ليست لديك صلاحية لهذا الإجراء."),
             DbUpdateException { InnerException: PostgresException { SqlState: "23505" } } => (409, "القيمة مسجلة مسبقًا (رقم مكرر)."),
+            PostgresException { SqlState: "23505" } => (409, "القيمة مسجلة مسبقًا (رقم مكرر)."),
+            DbUpdateException { InnerException: PostgresException { SqlState: "23514" } } or PostgresException { SqlState: "23514" } => (409, "العملية تخالف قيود البيانات (مثل رصيد سالب أو قطعة على شاحنتين)."),
+            PostgresException { SqlState: "42501" } => (403, "ليست لديك صلاحية لهذا الإجراء."),
             _ => (0, ""),
         };
         if (code == 0) return;   // unexpected: the global handler answers with a generic 500 and logs the details server-side

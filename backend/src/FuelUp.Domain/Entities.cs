@@ -367,13 +367,204 @@ public class VehicleQrToken : ITenantOwned { public Guid CompanyId { get; set; }
 public class VehicleEvent : Entity { public Guid VehicleId { get; set; } public string Type { get; set; } = ""; public string Title { get; set; } = ""; public string? Detail { get; set; } public decimal? Km { get; set; } public decimal? Cost { get; set; } public string Status { get; set; } = ""; public DateTimeOffset At { get; set; } public Guid ByUserId { get; set; } public string? CorrectionsJson { get; set; } }
 public class VehicleDocument : Entity { public Guid VehicleId { get; set; } public string Kind { get; set; } = ""; public string? Number { get; set; } public DateOnly? IssueDate { get; set; } public DateOnly Expiry { get; set; } public DateTimeOffset At { get; set; } }
 public class GpsPoint : ITenantOwned { public Guid CompanyId { get; set; } public long Id { get; set; } public Guid VehicleId { get; set; } public DateTimeOffset At { get; set; } public double Lat { get; set; } public double Lng { get; set; } public double? Speed { get; set; } public string? Address { get; set; } }
-public class Warehouse : Entity { public string Name { get; set; } = ""; }
-public class Employee : Entity { public string Name { get; set; } = ""; public string? Role { get; set; } public string? EmpNo { get; set; } }
-public class PartCatalog : Entity { public string Code { get; set; } = ""; public string Name { get; set; } = ""; public PartTracking Tracking { get; set; } public string Category { get; set; } = ""; public string? Brand { get; set; } public string? Model { get; set; } public string? MfrPartNo { get; set; } public string? Unit { get; set; } public decimal? MinQty { get; set; } public decimal? ReorderQty { get; set; } public int? InspectEveryDays { get; set; } }
-public class Part : Entity { public Guid CatalogId { get; set; } public string InternalNo { get; set; } = ""; public string? Serial { get; set; } public string? Brand { get; set; } public string? Model { get; set; } public string? Supplier { get; set; } public string? InvoiceNo { get; set; } public DateOnly? PurchaseDate { get; set; } public decimal? Cost { get; set; } public DateOnly? WarrantyEnd { get; set; } public PartStatus Status { get; set; } public Guid? WarehouseId { get; set; } public Guid? VehicleId { get; set; } public string? Position { get; set; } public string? HolderRef { get; set; } public DateTimeOffset? InstalledAt { get; set; } public decimal? InstallKm { get; set; } }
-public class StockBalance : ITenantOwned { public Guid CompanyId { get; set; } public Guid CatalogId { get; set; } public Guid WarehouseId { get; set; } public decimal Qty { get; set; } }
-public class PartMovement : Entity { public string Type { get; set; } = ""; public Guid? PartId { get; set; } public Guid CatalogId { get; set; } public decimal Qty { get; set; } public Guid? VehicleId { get; set; } public string? HolderRef { get; set; } public Guid? WorkOrderId { get; set; } public string? Reason { get; set; } public string? OldPartFate { get; set; } public decimal? Km { get; set; } public DateTimeOffset At { get; set; } public Guid ByUserId { get; set; } }
-public class WorkOrder : Entity { public string No { get; set; } = ""; public Guid VehicleId { get; set; } public string Type { get; set; } = ""; public string Description { get; set; } = ""; public decimal? LaborCost { get; set; } public bool Closed { get; set; } public DateTimeOffset OpenedAt { get; set; } }
+// ---------- custody & truck spare parts (العُهد وقطع الغيار) ----------
+public class Warehouse : Entity { public string Name { get; set; } = ""; public string? Location { get; set; } public string? Keeper { get; set; } public bool IsActive { get; set; } = true; }
+
+/// <summary>A person who can hold custody but is not a driver: technician, mechanic, storekeeper, office employee.</summary>
+public class Employee : Entity { public string Name { get; set; } = ""; public string? Role { get; set; } public string? EmpNo { get; set; } public string? Phone { get; set; } public bool IsActive { get; set; } = true; }
+
+/// <summary>Item definition. Individual items (tyre, battery, meter, pump, tracker…) are tracked one by one as <see cref="Part"/>;
+/// quantity items (oil, filters, bolts) by code and quantity in <see cref="StockBalance"/> / <see cref="HolderBalance"/>.</summary>
+public class PartCatalog : Entity
+{
+    public string Code { get; set; } = "";
+    public string Name { get; set; } = "";
+    public PartTracking Tracking { get; set; }
+    public string Category { get; set; } = "";
+    public string? Brand { get; set; }
+    public string? Model { get; set; }
+    public string? MfrPartNo { get; set; }
+    public string? Unit { get; set; }
+    public decimal? MinQty { get; set; }
+    public decimal? ReorderQty { get; set; }
+    public int? InspectEveryDays { get; set; }
+    public decimal? UnitCost { get; set; }          // last purchase cost per unit (quantity items) or reference cost
+    public string? Specs { get; set; }
+    public bool IsActive { get; set; } = true;
+}
+
+/// <summary>
+/// One individually tracked item. Where it is (warehouse / truck + position / repair vendor) and who holds it (driver or employee)
+/// are separate: changing a truck's driver never changes the parts installed on the truck.
+/// Its history is the append-only <see cref="PartMovement"/> ledger.
+/// </summary>
+public class Part : Entity
+{
+    public Guid CatalogId { get; set; }
+    public string InternalNo { get; set; } = "";          // P-000123, issued by the server; printed as barcode / QR
+    public string? Serial { get; set; }                   // factory serial (upper-case, no spaces)
+    public string? SerialKey { get; set; }                // MAKER|SERIAL: unique per company (same serial from the same maker refused)
+    public string? Brand { get; set; }
+    public string? Model { get; set; }
+    public string? Supplier { get; set; }
+    public string? InvoiceNo { get; set; }
+    public DateOnly? PurchaseDate { get; set; }
+    public decimal? Cost { get; set; }
+    public DateOnly? WarrantyStart { get; set; }
+    public DateOnly? WarrantyEnd { get; set; }
+    public string? WarrantyTerms { get; set; }
+    public string? BatchNo { get; set; }
+    public string? Specs { get; set; }
+    public DateOnly? ExpiryDate { get; set; }             // hoses, extinguishers, safety equipment
+    public DateOnly? LastInspection { get; set; }
+    public DateOnly? NextInspection { get; set; }
+    public string? Condition { get; set; }                // جديد / جيد / مستعمل / يحتاج فحص
+    public string? Notes { get; set; }
+    public Guid? MeterId { get; set; }                    // a fuel meter part linked to the meter master record
+    public PartStatus Status { get; set; }
+    public string? StatusReason { get; set; }
+    // location
+    public Guid? WarehouseId { get; set; }
+    public string? Bin { get; set; }
+    public Guid? VehicleId { get; set; }
+    public string? Position { get; set; }
+    public DateTimeOffset? InstalledAt { get; set; }
+    public decimal? InstallKm { get; set; }
+    public decimal? InstallHours { get; set; }
+    // custody holder (separate from the truck)
+    public string? HolderKind { get; set; }               // driver | employee
+    public Guid? HolderId { get; set; }
+    public string? HolderRef { get; set; }                // holder name at hand-over time
+    public DateTimeOffset? HolderSince { get; set; }
+    // repair / warranty claim / damage review
+    public string? RepairVendor { get; set; }
+    public DateTimeOffset? RepairSentAt { get; set; }
+    public DateOnly? RepairExpectedAt { get; set; }
+    public decimal? RepairCost { get; set; }
+    public string? ClaimRef { get; set; }
+    public DateTimeOffset? ClaimOpenedAt { get; set; }
+    public string? ClaimResult { get; set; }
+    public string? LastLocation { get; set; }             // where / with whom it was when declared damaged or lost
+    public string? ReviewOutcome { get; set; }
+    public Guid? ScrapApprovedBy { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+public class StockBalance : ITenantOwned { public Guid CompanyId { get; set; } public Guid CatalogId { get; set; } public Guid WarehouseId { get; set; } public decimal Qty { get; set; } public string? Bin { get; set; } }
+
+/// <summary>Quantity items held in custody by a person (e.g. a driver carrying 2 oil cans).</summary>
+public class HolderBalance : ITenantOwned
+{
+    public Guid CompanyId { get; set; }
+    public string HolderKind { get; set; } = "";
+    public Guid HolderId { get; set; }
+    public Guid CatalogId { get; set; }
+    public decimal Qty { get; set; }
+    public string HolderName { get; set; } = "";
+    public DateTimeOffset Since { get; set; }
+}
+
+/// <summary>Append-only ledger of everything that happened to a part or a quantity item. Corrections are new rows with a reason.</summary>
+public class PartMovement : Entity
+{
+    public string Type { get; set; } = "";
+    public Guid? PartId { get; set; }
+    public Guid CatalogId { get; set; }
+    public decimal Qty { get; set; }
+    public string? StatusBefore { get; set; }
+    public string? StatusAfter { get; set; }
+    public Guid? FromWarehouseId { get; set; }
+    public Guid? ToWarehouseId { get; set; }
+    public Guid? FromVehicleId { get; set; }
+    public Guid? VehicleId { get; set; }
+    public string? Position { get; set; }
+    public string? FromHolderKind { get; set; }
+    public Guid? FromHolderId { get; set; }
+    public string? FromHolderRef { get; set; }
+    public string? HolderKind { get; set; }
+    public Guid? HolderId { get; set; }
+    public string? HolderRef { get; set; }
+    public Guid? WorkOrderId { get; set; }
+    public string? Reason { get; set; }
+    public string? OldPartFate { get; set; }
+    public Guid? RelatedPartId { get; set; }           // replacement: the other part (old ↔ new)
+    public Guid? TransferId { get; set; }
+    public decimal? Km { get; set; }
+    public decimal? Hours { get; set; }
+    public decimal? UnitCost { get; set; }
+    public decimal? Cost { get; set; }
+    public string? Vendor { get; set; }
+    public string? DocRef { get; set; }
+    public string? BatchNo { get; set; }
+    public DateOnly? ExpectedReturn { get; set; }
+    public string? Note { get; set; }
+    public Guid? CorrectsId { get; set; }
+    public DateTimeOffset At { get; set; }
+    public Guid ByUserId { get; set; }
+    public Guid? ApprovedBy { get; set; }
+}
+
+/// <summary>Hand-over of custody between people, trucks and warehouses: recorded by the giver, completed only when the receiver accepts.</summary>
+public class CustodyTransfer : Entity
+{
+    public string No { get; set; } = "";
+    public string Kind { get; set; } = "transfer";    // issue | transfer | qty-issue | qty-transfer
+    public Guid? PartId { get; set; }
+    public Guid CatalogId { get; set; }
+    public decimal Qty { get; set; } = 1;
+    public Guid? WorkOrderId { get; set; }
+    public string? Reason { get; set; }
+    public string FromKind { get; set; } = "";        // driver | employee | warehouse | vehicle
+    public Guid FromId { get; set; }
+    public string FromName { get; set; } = "";
+    public string ToKind { get; set; } = "";
+    public Guid ToId { get; set; }
+    public string ToName { get; set; } = "";
+    public string? Position { get; set; }
+    public decimal? Km { get; set; }
+    public string Status { get; set; } = "Pending";   // Pending | Accepted | Rejected
+    public string? Condition { get; set; }
+    public string? HandoverBy { get; set; }
+    public string? HandoverNote { get; set; }
+    public DateTimeOffset RequestedAt { get; set; }
+    public Guid RequestedBy { get; set; }
+    public DateTimeOffset? DecidedAt { get; set; }
+    public Guid? DecidedBy { get; set; }
+    public string? DecisionNote { get; set; }
+}
+
+public record CountLine(Guid CatalogId, string Code, string Name, string? Bin, decimal Recorded, decimal Actual);
+
+/// <summary>A physical stock count of one warehouse: recorded vs actual, differences posted as adjustment movements.</summary>
+public class StockCount : Entity
+{
+    public string No { get; set; } = "";
+    public Guid WarehouseId { get; set; }
+    public DateTimeOffset At { get; set; }
+    public Guid ByUserId { get; set; }
+    public string? Note { get; set; }
+    public List<CountLine> Lines { get; set; } = new();
+    public List<string> MissingParts { get; set; } = new();
+    public List<string> UnexpectedParts { get; set; } = new();
+}
+
+public class WorkOrder : Entity
+{
+    public string No { get; set; } = "";
+    public Guid VehicleId { get; set; }
+    public string Type { get; set; } = "";
+    public string Description { get; set; } = "";
+    public string? Workshop { get; set; }
+    public decimal? Km { get; set; }
+    public decimal? LaborCost { get; set; }
+    public bool Closed { get; set; }
+    public DateTimeOffset OpenedAt { get; set; }
+    public Guid? OpenedBy { get; set; }
+    public Guid? DriverId { get; set; }               // driver of the truck when the order was opened (snapshot)
+    public DateTimeOffset? ClosedAt { get; set; }
+    public Guid? ClosedBy { get; set; }
+    public string? CloseNote { get; set; }
+}
 
 /// <summary>Per-company, per-month counter for order numbers (atomic, see TripService.NextNoAsync).</summary>
 public class TripCounter : ITenantOwned { public Guid CompanyId { get; set; } public string Period { get; set; } = ""; public int Last { get; set; } }
