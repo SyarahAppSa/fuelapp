@@ -144,6 +144,20 @@ var app = builder.Build();
         app.Logger.LogWarning("ConnectionStrings:Migrations is not set: the API runs with the owner role. Use a separate restricted role in production.");
 }
 
+// Sample data for trying the system (Seed__Sample=true): loaded once in the background after start-up, so deploys stay fast.
+if (cfg.GetValue<bool>("Seed:Sample"))
+    app.Lifetime.ApplicationStarted.Register(() => _ = Task.Run(async () =>
+    {
+        try
+        {
+            var opts = new DbContextOptionsBuilder<FuelUpDb>().UseNpgsql(Cs("Migrations") ?? runtimeCs).UseSnakeCaseNamingConvention().AddInterceptors(interceptor).Options;
+            var tenant = new TenantContext();
+            await using var db = new FuelUpDb(opts, tenant);
+            await SampleData.RunAsync(db, tenant, cfg, app.Logger);
+        }
+        catch (Exception e) { app.Logger.LogError(e, "Sample data failed"); }
+    }));
+
 if (trustedNetworks.Length > 0) app.UseForwardedHeaders();
 app.UseExceptionHandler(e => e.Run(async ctx =>
 {
