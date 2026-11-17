@@ -25,7 +25,7 @@ public enum AckState { Pending = 0, Confirmed = 1, Disputed = 2 }
 /// <summary>Permission sections, identical to the current FuelUp build.</summary>
 public enum Section
 {
-    Ops, Moves, Approve, Assign, Meters, Tracking, Custody, VehicleFile, Costs, Master, Users, Driver, Export,
+    Ops, Moves, Approve, Assign, Meters, Tracking, Custody, VehicleFile, Costs, Master, Users, Driver, Export, Attendance,
 }
 
 public enum PermissionLevel { None = 0, View = 1, Edit = 2 }

@@ -50,6 +50,7 @@ public class FuelUpDb(DbContextOptions<FuelUpDb> options, TenantContext? tenant 
     public DbSet<PartMovement> PartMovements => Set<PartMovement>();
     public DbSet<WorkOrder> WorkOrders => Set<WorkOrder>();
     public DbSet<TripCounter> TripCounters => Set<TripCounter>();
+    public DbSet<AttendanceRecord> Attendance => Set<AttendanceRecord>();
 
     public bool IsPostgres => Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL";
 
@@ -116,6 +117,8 @@ public class FuelUpDb(DbContextOptions<FuelUpDb> options, TenantContext? tenant 
         b.Entity<StockBalance>().HasKey(x => new { x.CatalogId, x.WarehouseId });
         b.Entity<PartMovement>().HasIndex(x => new { x.PartId, x.At });
         b.Entity<WorkOrder>().HasIndex(x => new { x.CompanyId, x.No }).IsUnique();
+        // one open period per user at a time (enforced by the database, so two quick taps cannot open two)
+        b.Entity<AttendanceRecord>(e => { e.ToTable("attendance"); e.HasIndex(x => x.UserId).IsUnique().HasFilter("check_out_at IS NULL").HasDatabaseName("ux_attendance_open"); e.HasIndex(x => new { x.CompanyId, x.Day }); });
         b.Entity<TripCounter>(e => { e.ToTable("trip_counters"); e.HasKey(x => new { x.CompanyId, x.Period }); e.Property(x => x.Period).HasMaxLength(4); });
 
         foreach (var p in b.Model.GetEntityTypes().SelectMany(t => t.GetProperties()).Where(p => p.ClrType == typeof(decimal) || p.ClrType == typeof(decimal?)))

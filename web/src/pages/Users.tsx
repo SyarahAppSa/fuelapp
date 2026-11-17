@@ -8,7 +8,7 @@ type Level = 'None' | 'View' | 'Edit'
 interface UserRow { id: string; username: string; displayName: string; role: string; driverId?: string; isActive: boolean; mfaEnabled: boolean; lastLoginAt?: string; permissions: { section: string; level: Level }[] }
 
 const sections: [string, string][] = [['Ops', 'التشغيل والرحلات'], ['Moves', 'تقارير الحركة'], ['Approve', 'الاعتماد'], ['Assign', 'الإسناد'], ['Meters', 'العدادات'], ['Tracking', 'التتبع'],
-  ['Custody', 'العهد وقطع الغيار'], ['VehicleFile', 'ملف المركبة'], ['Costs', 'التكاليف'], ['Master', 'البيانات الأساسية'], ['Users', 'المستخدمون'], ['Driver', 'تطبيق السائق'], ['Export', 'التصدير']]
+  ['Custody', 'العهد وقطع الغيار'], ['VehicleFile', 'ملف المركبة'], ['Costs', 'التكاليف'], ['Master', 'البيانات الأساسية'], ['Users', 'المستخدمون'], ['Driver', 'تطبيق السائق'], ['Export', 'التصدير'], ['Attendance', 'الحضور والانصراف (للمشرفين)']]
 const roles: [string, string][] = [['Admin', 'مدير المنظومة'], ['OpsSupervisor', 'مشرف تشغيل'], ['Storekeeper', 'أمين مستودع'], ['Driver', 'سائق'], ['Viewer', 'اطلاع فقط'], ['Custom', 'مخصص']]
 const roleName = (r: string) => roles.find(x => x[0] === r)?.[1] ?? r
 

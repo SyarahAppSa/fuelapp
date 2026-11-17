@@ -11,6 +11,7 @@ import MasterData from './pages/MasterData'
 import Assignments from './pages/Assignments'
 import Users from './pages/Users'
 import Meters from './pages/Meters'
+import Attendance from './pages/Attendance'
 
 export function useMe() {
   return useQuery({ queryKey: ['me'], queryFn: () => api<Me>('/api/me'), staleTime: 60_000, retry: false })
@@ -104,6 +105,7 @@ function Layout() {
     { to: '/', label: 'لوحة التحكم', show: can(me, 'Ops') },
     { to: '/trips', label: 'الرحلات', show: can(me, 'Ops') },
     { to: '/fill-report', label: 'تقرير عمليات التعبئة', show: can(me, 'Moves') },
+    { to: '/attendance', label: 'الحضور والانصراف', show: true },
     { to: '/assign', label: 'الإسناد', show: can(me, 'Assign') },
     { to: '/meters', label: 'العدادات', show: can(me, 'Meters') },
     { to: '/master', label: 'البيانات الأساسية', show: can(me, 'Master') },
@@ -128,6 +130,7 @@ function Layout() {
           <Route path="/trips" element={<Trips />} />
           <Route path="/fill-report" element={<FillReport />} />
           <Route path="/security" element={<Security />} />
+          <Route path="/attendance" element={<Attendance />} />
           <Route path="/assign" element={<Assignments />} />
           <Route path="/meters" element={<Meters />} />
           <Route path="/master" element={<MasterData />} />

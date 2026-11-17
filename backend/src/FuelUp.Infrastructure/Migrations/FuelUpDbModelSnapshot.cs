@@ -106,6 +106,78 @@ namespace FuelUp.Infrastructure.Migrations
                     b.ToTable("attachments", (string)null);
                 });
 
+            modelBuilder.Entity("FuelUp.Domain.AttendanceRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CheckInAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("check_in_at");
+
+                    b.Property<DateTimeOffset?>("CheckOutAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("check_out_at");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<bool>("Corrected")
+                        .HasColumnType("boolean")
+                        .HasColumnName("corrected");
+
+                    b.Property<DateOnly>("Day")
+                        .HasColumnType("date")
+                        .HasColumnName("day");
+
+                    b.Property<string>("InIp")
+                        .HasColumnType("text")
+                        .HasColumnName("in_ip");
+
+                    b.Property<double?>("InLat")
+                        .HasColumnType("double precision")
+                        .HasColumnName("in_lat");
+
+                    b.Property<double?>("InLng")
+                        .HasColumnType("double precision")
+                        .HasColumnName("in_lng");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("note");
+
+                    b.Property<string>("OutIp")
+                        .HasColumnType("text")
+                        .HasColumnName("out_ip");
+
+                    b.Property<double?>("OutLat")
+                        .HasColumnType("double precision")
+                        .HasColumnName("out_lat");
+
+                    b.Property<double?>("OutLng")
+                        .HasColumnType("double precision")
+                        .HasColumnName("out_lng");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_attendance");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_attendance_open")
+                        .HasFilter("check_out_at IS NULL");
+
+                    b.HasIndex("CompanyId", "Day")
+                        .HasDatabaseName("ix_attendance_company_id_day");
+
+                    b.ToTable("attendance", (string)null);
+                });
+
             modelBuilder.Entity("FuelUp.Domain.AuditEntry", b =>
                 {
                     b.Property<long>("Id")

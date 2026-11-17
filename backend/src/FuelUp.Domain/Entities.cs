@@ -371,3 +371,23 @@ public class WorkOrder : Entity { public string No { get; set; } = ""; public Gu
 
 /// <summary>Per-company, per-month counter for order numbers (atomic, see TripService.NextNoAsync).</summary>
 public class TripCounter : ITenantOwned { public Guid CompanyId { get; set; } public string Period { get; set; } = ""; public int Last { get; set; } }
+
+/// <summary>
+/// One work period of a user: check-in and check-out. Times are taken from the server clock (a phone or browser cannot
+/// back-date them). Corrections by a manager keep the original values in the audit log.
+/// </summary>
+public class AttendanceRecord : Entity
+{
+    public Guid UserId { get; set; }
+    public DateOnly Day { get; set; }                 // Saudi date of the check-in
+    public DateTimeOffset CheckInAt { get; set; }
+    public DateTimeOffset? CheckOutAt { get; set; }
+    public double? InLat { get; set; }
+    public double? InLng { get; set; }
+    public double? OutLat { get; set; }
+    public double? OutLng { get; set; }
+    public string? InIp { get; set; }
+    public string? OutIp { get; set; }
+    public string? Note { get; set; }
+    public bool Corrected { get; set; }
+}

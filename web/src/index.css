@@ -88,3 +88,8 @@ input, select, textarea { border: 1px solid var(--line); background: var(--surfa
 .codes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; padding: 12px 28px; background: var(--surface-2); border-radius: 10px; direction: ltr; text-align: left }
 .okmsg { background: var(--ok-soft); color: var(--ok); padding: 10px 12px; border-radius: 10px; font-weight: 700 }
 .form-side .form { display: flex; flex-direction: column; gap: 12px; width: min(420px, 100%) }
+
+/* attendance punch button */
+.btn.punch { font-size: 20px; font-weight: 800; padding: 22px 18px; border-radius: 14px; border: 0; color: #fff; min-height: 84px }
+.btn.punch.in { background: var(--ok) }
+.btn.punch.out { background: var(--brand-red) }
