@@ -43,6 +43,7 @@ export default function MasterData() {
           <Field label="الشركة المصنعة"><input name="make" maxLength={40} /></Field>
           <Field label="الطراز"><input name="model" maxLength={40} /></Field>
           <Field label="سنة الصنع"><input name="year" type="number" min={1980} max={2100} /></Field>
+          <Field label="لوحة المقطورة (إن وُجدت)"><input name="trailerPlate" maxLength={20} /></Field>
           <Field label="السعة (لتر) *"><input name="capacity" type="number" min={0} max={100000} required /></Field>
           <Field label="عداد التعبئة"><select name="meterId"><option value="">— بدون —</option>{meters.data?.map(m => <option key={m.id} value={m.id}>{m.serial}</option>)}</select></Field>
         </div><div className="actions"><button className="btn pri" disabled={act.busy}>إضافة مركبة</button></div></form>}
@@ -56,6 +57,7 @@ export default function MasterData() {
           <Field label="الاسم *"><input name="name" required maxLength={100} /></Field>
           <Field label="الرقم الوظيفي"><input name="empNo" maxLength={30} /></Field>
           <Field label="الجوال"><input name="phone" inputMode="tel" pattern="\+?[0-9 ]{7,20}" maxLength={20} /></Field>
+          <Field label="رقم الهوية / الإقامة"><input name="nationalId" inputMode="numeric" pattern="[12][0-9]{9}" maxLength={10} /></Field>
           <Field label="النوع *"><select name="type" required>{Object.entries(driverTypes).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
         </div><div className="actions"><button className="btn pri" disabled={act.busy}>إضافة سائق</button></div></form>}
         <Panel title="السائقون"><div className="tblw"><table><thead><tr><th>الاسم</th><th>الرقم الوظيفي</th><th>الجوال</th><th>النوع</th></tr></thead>

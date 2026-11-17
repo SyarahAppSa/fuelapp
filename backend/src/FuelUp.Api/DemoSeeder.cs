@@ -33,7 +33,7 @@ public static class DemoSeeder
             new Vehicle { Plate = "ب ح د 1307", InternalNo = "T-11", Make = "فولفو", Model = "FH 460", Year = 2019, Capacity = 20000, Compartments = [new(1, 10000), new(2, 10000)], MeterId = meters[1].Id },
         };
         meters[0].VehicleId = vehicles[0].Id; meters[1].VehicleId = vehicles[1].Id;
-        var drivers = new[] { new Driver { Name = "سالم العتيبي", EmpNo = "E100", Type = DriverType.Aramco }, new Driver { Name = "خالد الدوسري", EmpNo = "E101", Type = DriverType.SmallTruck } };
+        var drivers = new[] { new Driver { Name = "سالم العتيبي", EmpNo = "E100", Phone = "0551234567", NationalId = "1012345678", Type = DriverType.Aramco }, new Driver { Name = "خالد الدوسري", EmpNo = "E101", Phone = "0559876543", NationalId = "2098765432", Type = DriverType.SmallTruck } };
         var customers = new[]
         {
             new Customer { Name = "مقاولات الجبيل", Project = "مشروع الطريق الدائري", Site = "موقع الكسارة — الجبيل", Recipient = "مشرف الموقع", Lat = 27.0, Lng = 49.6 },

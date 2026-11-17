@@ -96,6 +96,13 @@ export async function logout() {
   accessToken = null
 }
 
+/** Loads a protected file (a photo) with the current token and returns a temporary object URL for <img>. */
+export async function blobUrl(path: string): Promise<string> {
+  const res = await raw(path)
+  if (!res.ok) throw new ApiError(res.status, 'تعذر تحميل الصورة.')
+  return URL.createObjectURL(await res.blob())
+}
+
 /** Downloads a server-generated file (Excel) with the current token. */
 export async function download(path: string, filename: string) {
   const res = await raw(path)

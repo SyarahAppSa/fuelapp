@@ -36,6 +36,10 @@ namespace FuelUp.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("captured_at");
 
+                    b.Property<Guid?>("ClientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("client_id");
+
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid")
                         .HasColumnName("company_id");
@@ -66,6 +70,10 @@ namespace FuelUp.Infrastructure.Migrations
                     b.Property<double?>("Lng")
                         .HasColumnType("double precision")
                         .HasColumnName("lng");
+
+                    b.Property<string>("LocationNote")
+                        .HasColumnType("text")
+                        .HasColumnName("location_note");
 
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uuid")
@@ -99,6 +107,11 @@ namespace FuelUp.Infrastructure.Migrations
 
                     b.HasIndex("Sha256")
                         .HasDatabaseName("ix_attachments_sha256");
+
+                    b.HasIndex("OwnerId", "ClientId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_attachments_owner_id_client_id")
+                        .HasFilter("client_id IS NOT NULL");
 
                     b.HasIndex("OwnerType", "OwnerId")
                         .HasDatabaseName("ix_attachments_owner_type_owner_id");
@@ -407,6 +420,10 @@ namespace FuelUp.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("name");
 
+                    b.Property<string>("NationalId")
+                        .HasColumnType("text")
+                        .HasColumnName("national_id");
+
                     b.Property<string>("Phone")
                         .HasColumnType("text")
                         .HasColumnName("phone");
@@ -449,6 +466,171 @@ namespace FuelUp.Infrastructure.Migrations
                         .HasName("pk_employees");
 
                     b.ToTable("employees", (string)null);
+                });
+
+            modelBuilder.Entity("FuelUp.Domain.FillReport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ArrivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("arrived_at");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("CustomerName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("customer_name");
+
+                    b.Property<string>("DeliverySite")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("delivery_site");
+
+                    b.Property<Guid>("DriverId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("driver_id");
+
+                    b.Property<string>("DriverName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("driver_name");
+
+                    b.Property<bool>("LoadedFromTrip")
+                        .HasColumnType("boolean")
+                        .HasColumnName("loaded_from_trip");
+
+                    b.Property<decimal?>("LoadedQty")
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("loaded_qty");
+
+                    b.Property<string>("LoadingSite")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("loading_site");
+
+                    b.Property<decimal?>("MeterAfter")
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("meter_after");
+
+                    b.Property<decimal?>("MeterBefore")
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("meter_before");
+
+                    b.Property<string>("No")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("no");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("outcome");
+
+                    b.Property<string>("OutcomeReason")
+                        .HasColumnType("text")
+                        .HasColumnName("outcome_reason");
+
+                    b.Property<string>("Plate")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("plate");
+
+                    b.Property<DateTimeOffset?>("PostFillAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("post_fill_at");
+
+                    b.Property<DateTimeOffset?>("PreFillAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("pre_fill_at");
+
+                    b.Property<string>("Product")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("product");
+
+                    b.Property<decimal>("QtyRequested")
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("qty_requested");
+
+                    b.Property<string>("ReviewNote")
+                        .HasColumnType("text")
+                        .HasColumnName("review_note");
+
+                    b.Property<string>("ReviewReasons")
+                        .HasColumnType("text")
+                        .HasColumnName("review_reasons");
+
+                    b.Property<DateTimeOffset?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reviewed_at");
+
+                    b.Property<Guid?>("ReviewedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reviewed_by");
+
+                    b.Property<string>("SecretMeterSerial")
+                        .HasColumnType("text")
+                        .HasColumnName("secret_meter_serial");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<Guid>("StartedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("started_by");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset?>("SubmittedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("submitted_at");
+
+                    b.Property<string>("TankState")
+                        .HasColumnType("text")
+                        .HasColumnName("tank_state");
+
+                    b.Property<string>("TrailerPlate")
+                        .HasColumnType("text")
+                        .HasColumnName("trailer_plate");
+
+                    b.Property<Guid>("TripId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("trip_id");
+
+                    b.Property<string>("TripNo")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("trip_no");
+
+                    b.Property<DateTimeOffset?>("UnloadedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("unloaded_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_fill_reports");
+
+                    b.HasIndex("TripId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_fill_reports_trip_id");
+
+                    b.HasIndex("CompanyId", "No")
+                        .IsUnique()
+                        .HasDatabaseName("ix_fill_reports_company_id_no");
+
+                    b.HasIndex("CompanyId", "Status", "StartedAt")
+                        .HasDatabaseName("ix_fill_reports_company_id_status_started_at");
+
+                    b.ToTable("fill_reports", (string)null);
                 });
 
             modelBuilder.Entity("FuelUp.Domain.GpsPoint", b =>
@@ -1794,6 +1976,10 @@ namespace FuelUp.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("jsonb")
                         .HasColumnName("plate_history");
+
+                    b.Property<string>("TrailerPlate")
+                        .HasColumnType("text")
+                        .HasColumnName("trailer_plate");
 
                     b.Property<string>("Vin")
                         .HasColumnType("text")

@@ -51,6 +51,7 @@ public class FuelUpDb(DbContextOptions<FuelUpDb> options, TenantContext? tenant 
     public DbSet<WorkOrder> WorkOrders => Set<WorkOrder>();
     public DbSet<TripCounter> TripCounters => Set<TripCounter>();
     public DbSet<AttendanceRecord> Attendance => Set<AttendanceRecord>();
+    public DbSet<FillReport> FillReports => Set<FillReport>();
 
     public bool IsPostgres => Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL";
 
@@ -98,7 +99,7 @@ public class FuelUpDb(DbContextOptions<FuelUpDb> options, TenantContext? tenant 
         b.Entity<MeterBaseline>(e => { e.HasIndex(x => x.MeterId); e.Property(x => x.State).HasConversion<string>(); });
         b.Entity<MeterReset>().HasIndex(x => x.MeterId);
 
-        b.Entity<Attachment>(e => { e.HasIndex(x => new { x.OwnerType, x.OwnerId }); e.HasIndex(x => x.Sha256); });
+        b.Entity<Attachment>(e => { e.HasIndex(x => new { x.OwnerType, x.OwnerId }); e.HasIndex(x => x.Sha256); e.HasIndex(x => new { x.OwnerId, x.ClientId }).IsUnique().HasFilter("client_id IS NOT NULL"); });
         b.Entity<AuditEntry>(e => { e.HasIndex(x => new { x.Entity, x.EntityId }); e.HasIndex(x => new { x.CompanyId, x.At }); });
         b.Entity<Notification>(e => { e.HasIndex(x => new { x.DriverId, x.ReadAt }); e.HasIndex(x => x.UserId); });
 
@@ -119,6 +120,16 @@ public class FuelUpDb(DbContextOptions<FuelUpDb> options, TenantContext? tenant 
         b.Entity<WorkOrder>().HasIndex(x => new { x.CompanyId, x.No }).IsUnique();
         // one open period per user at a time (enforced by the database, so two quick taps cannot open two)
         b.Entity<AttendanceRecord>(e => { e.ToTable("attendance"); e.HasIndex(x => x.UserId).IsUnique().HasFilter("check_out_at IS NULL").HasDatabaseName("ux_attendance_open"); e.HasIndex(x => new { x.CompanyId, x.Day }); });
+        b.Entity<FillReport>(e =>
+        {
+            e.ToTable("fill_reports");
+            e.HasIndex(x => x.TripId).IsUnique();                    // one report per trip
+            e.HasIndex(x => new { x.CompanyId, x.No }).IsUnique();
+            e.HasIndex(x => new { x.CompanyId, x.Status, x.StartedAt });
+            e.Property(x => x.Status).HasConversion<string>();
+            e.Property(x => x.Outcome).HasConversion<string>();
+            e.Ignore(x => x.DeliveredQty);
+        });
         b.Entity<TripCounter>(e => { e.ToTable("trip_counters"); e.HasKey(x => new { x.CompanyId, x.Period }); e.Property(x => x.Period).HasMaxLength(4); });
 
         foreach (var p in b.Model.GetEntityTypes().SelectMany(t => t.GetProperties()).Where(p => p.ClrType == typeof(decimal) || p.ClrType == typeof(decimal?)))

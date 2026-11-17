@@ -29,13 +29,19 @@ public class MasterDataController(FuelUpDb db, ActorAccessor actor, AuditWriter 
 
     [HttpGet("stations")] public async Task<IActionResult> Stations() { await Need(PermissionLevel.View); return Ok(await db.Stations.OrderBy(x => x.Name).ToListAsync()); }
     [HttpGet("vehicles")] public async Task<IActionResult> Vehicles() { await Need(PermissionLevel.View); return Ok(await db.Vehicles.OrderBy(x => x.Plate).ToListAsync()); }
-    [HttpGet("drivers")] public async Task<IActionResult> Drivers() { await Need(PermissionLevel.View); return Ok(await db.Drivers.OrderBy(x => x.Name).ToListAsync()); }
+    [HttpGet("drivers")]
+    public async Task<IActionResult> Drivers()
+    {
+        var a = await Need(PermissionLevel.View);
+        var full = a.Can(Section.Master, PermissionLevel.Edit) || a.Can(Section.Users);   // national ID is personal data
+        return Ok(await db.Drivers.OrderBy(x => x.Name).Select(x => new { x.Id, x.Name, x.EmpNo, x.Phone, x.Type, NationalId = full ? x.NationalId : null }).ToListAsync());
+    }
     [HttpGet("customers")] public async Task<IActionResult> Customers() { await Need(PermissionLevel.View); return Ok(await db.Customers.OrderBy(x => x.Name).ToListAsync()); }
     [HttpGet("meters")] public async Task<IActionResult> Meters() { await Need(PermissionLevel.View); return Ok(await db.Meters.OrderBy(x => x.Serial).ToListAsync()); }
 
     // Inputs are explicit DTOs: a client can never set Id, CompanyId, history or other server-owned fields (no mass assignment).
     [HttpPost("stations")] public Task<IActionResult> Add(StationInput i) => Save(new Station { Name = i.Name.Trim(), Type = i.Type, City = i.City, Lat = i.Lat, Lng = i.Lng }, "موقع تعبئة");
-    [HttpPost("drivers")] public Task<IActionResult> Add(DriverInput i) => Save(new Driver { Name = i.Name.Trim(), EmpNo = i.EmpNo, Phone = i.Phone, Type = i.Type }, "سائق");
+    [HttpPost("drivers")] public Task<IActionResult> Add(DriverInput i) => Save(new Driver { Name = i.Name.Trim(), EmpNo = i.EmpNo, Phone = i.Phone, NationalId = i.NationalId?.Trim(), Type = i.Type }, "سائق");
     [HttpPost("customers")] public Task<IActionResult> Add(CustomerInput i) => Save(new Customer { Name = i.Name.Trim(), Project = i.Project, Site = i.Site, Recipient = i.Recipient, RecipientPhone = i.RecipientPhone, Lat = i.Lat, Lng = i.Lng }, "وجهة");
     [HttpPost("meters")] public Task<IActionResult> Add(MeterInput i) => Save(new Meter { Serial = i.Serial.Trim(), Kind = i.Kind, LastCalibration = i.LastCalibration, NextCalibration = i.NextCalibration }, "عداد");
 
@@ -64,8 +70,8 @@ public class MasterDataController(FuelUpDb db, ActorAccessor actor, AuditWriter 
     }
 
     private static void Apply(Vehicle v, VehicleInput i) =>
-        (v.Plate, v.InternalNo, v.Vin, v.Make, v.Model, v.Year, v.AramcoNo, v.AfaqyUnit, v.Capacity, v.Compartments, v.MeterId) =
-        (i.Plate.Trim(), i.InternalNo, i.Vin, i.Make, i.Model, i.Year, i.AramcoNo, i.AfaqyUnit, i.Capacity, i.Compartments ?? [], i.MeterId);
+        (v.Plate, v.InternalNo, v.Vin, v.Make, v.Model, v.Year, v.AramcoNo, v.AfaqyUnit, v.Capacity, v.Compartments, v.MeterId, v.TrailerPlate) =
+        (i.Plate.Trim(), i.InternalNo, i.Vin, i.Make, i.Model, i.Year, i.AramcoNo, i.AfaqyUnit, i.Capacity, i.Compartments ?? [], i.MeterId, string.IsNullOrWhiteSpace(i.TrailerPlate) ? null : i.TrailerPlate.Trim());
 
     private async Task<IActionResult> Save<T>(T x, string label) where T : Entity
     {
@@ -78,13 +84,14 @@ public class MasterDataController(FuelUpDb db, ActorAccessor actor, AuditWriter 
 }
 
 public record StationInput([Required, StringLength(100)] string Name, StationType Type, [StringLength(60)] string? City, [Range(-90, 90)] double? Lat, [Range(-180, 180)] double? Lng);
-public record DriverInput([Required, StringLength(100)] string Name, [StringLength(30)] string? EmpNo, [StringLength(20), RegularExpression(@"^\+?[0-9 ]{7,20}$")] string? Phone, DriverType Type);
+public record DriverInput([Required, StringLength(100)] string Name, [StringLength(30)] string? EmpNo, [StringLength(20), RegularExpression(@"^\+?[0-9 ]{7,20}$")] string? Phone, DriverType Type,
+    [StringLength(10, MinimumLength = 10), RegularExpression("^[12][0-9]{9}$", ErrorMessage = "رقم الهوية أو الإقامة 10 أرقام يبدأ بـ 1 أو 2")] string? NationalId = null);
 public record CustomerInput([Required, StringLength(150)] string Name, [StringLength(150)] string? Project, [Required, StringLength(200)] string Site, [StringLength(100)] string? Recipient,
     [StringLength(20), RegularExpression(@"^\+?[0-9 ]{7,20}$")] string? RecipientPhone, [Range(-90, 90)] double? Lat, [Range(-180, 180)] double? Lng);
 public record MeterInput([Required, StringLength(50)] string Serial, [StringLength(80)] string? Kind, DateOnly? LastCalibration, DateOnly? NextCalibration);
 public record VehicleInput([Required, StringLength(20)] string Plate, [StringLength(20)] string? InternalNo, [StringLength(30)] string? Vin, [StringLength(40)] string? Make,
     [StringLength(40)] string? Model, [Range(1980, 2100)] int? Year, [StringLength(30)] string? AramcoNo, [StringLength(40)] string? AfaqyUnit,
-    [Range(typeof(decimal), "0", "100000")] decimal Capacity, [MaxLength(10)] List<Compartment>? Compartments, Guid? MeterId);
+    [Range(typeof(decimal), "0", "100000")] decimal Capacity, [MaxLength(10)] List<Compartment>? Compartments, Guid? MeterId, [StringLength(20)] string? TrailerPlate = null);
 
 public record AssignRequest(Guid? DriverId, [StringLength(500)] string? Note);
 
@@ -208,6 +215,12 @@ public class AttachmentsController(FuelUpDb db, ActorAccessor actor, FileStore s
     /// <summary>Object-level check: operations staff see any trip of their company; a driver only his own trips.</summary>
     private async Task CanActOnAsync(Actor a, string ownerType, Guid ownerId, bool write)
     {
+        if (ownerType == "fillreport")   // fill report photos: the report's driver, or staff with the Fill Reports permission
+        {
+            var rep = await db.FillReports.Where(x => x.Id == ownerId).Select(x => new { x.DriverId }).FirstOrDefaultAsync() ?? throw new NotFoundException("التقرير");
+            if (!(a.Can(Section.Driver, PermissionLevel.Edit) && a.DriverId == rep.DriverId) && !a.Can(Section.FillReports, write ? PermissionLevel.Edit : PermissionLevel.View)) throw new ForbiddenException();
+            return;
+        }
         if (ownerType != "trip") throw new NotFoundException("العملية");
         var t = await db.Trips.Where(x => x.Id == ownerId).Select(x => new { x.DriverId }).FirstOrDefaultAsync() ?? throw new NotFoundException("العملية");
         var staff = a.Can(Section.Ops, write ? PermissionLevel.Edit : PermissionLevel.View) || (!write && (a.Can(Section.Moves) || a.Can(Section.Approve)));
