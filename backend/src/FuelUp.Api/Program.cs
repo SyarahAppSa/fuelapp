@@ -51,6 +51,7 @@ builder.Services.AddScoped<AuditWriter>();
 builder.Services.AddScoped<MeterLedger>();
 builder.Services.AddScoped<AssignmentService>();
 builder.Services.AddScoped<TripService>();
+builder.Services.AddScoped<CustodyService>();
 builder.Services.AddScoped<ActorAccessor>();
 builder.Services.AddScoped<SessionService>();
 builder.Services.AddSingleton<TokenService>();

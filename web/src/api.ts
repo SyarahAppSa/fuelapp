@@ -103,6 +103,16 @@ export async function blobUrl(path: string): Promise<string> {
   return URL.createObjectURL(await res.blob())
 }
 
+/** Sends a multipart form (a photo or PDF) with the current token; the browser sets the multipart content type. */
+export async function upload<T>(path: string, body: FormData): Promise<T> {
+  if (!accessToken) await refresh()
+  const send = () => fetch(path, { method: 'POST', credentials: 'same-origin', body, headers: accessToken ? { authorization: `Bearer ${accessToken}` } : {} })
+  let res = await send()
+  if (res.status === 401 && await refresh()) res = await send()
+  if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => ({}))).error || 'تعذر رفع الملف.')
+  return res.json()
+}
+
 /** Downloads a server-generated file (Excel) with the current token. */
 export async function download(path: string, filename: string) {
   const res = await raw(path)

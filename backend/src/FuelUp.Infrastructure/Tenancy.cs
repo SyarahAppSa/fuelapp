@@ -57,7 +57,7 @@ public static class DbHardening
 {
     // Tables reached before the company is known (sign-in, token refresh). Protected by EF filters and code instead.
     private static readonly string[] PreTenantTables = ["users", "user_sessions", "refresh_tokens"];
-    private static readonly string[] AppendOnly = ["audit", "meter_readings"];
+    private static readonly string[] AppendOnly = ["audit", "meter_readings", "part_movements"];
     private static readonly string[] AppDeletes = ["user_permissions"];
 
     public static async Task ApplyAsync(FuelUpDb db, string? appRole, CancellationToken ct = default)

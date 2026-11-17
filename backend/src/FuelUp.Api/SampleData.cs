@@ -18,12 +18,17 @@ public static class SampleData
 
     public static async Task RunAsync(FuelUpDb db, TenantContext tenant, IConfiguration cfg, ILogger log)
     {
-        var password = cfg["Seed:SamplePassword"];
-        if (Passwords.Problem(password, "driver01") is { } p) { log.LogWarning("Sample data skipped: Seed__SamplePassword refused ({Problem})", p); return; }
         var company = await db.Companies.IgnoreQueryFilters().OrderBy(c => c.CreatedAt).FirstOrDefaultAsync();
         if (company is null) { log.LogWarning("Sample data skipped: no company yet"); return; }
         tenant.Set(company.Id);
-        if (await db.Settings.AnyAsync(s => s.Key == "sample_data")) { log.LogInformation("Sample data already loaded"); return; }
+        if (await db.Settings.AnyAsync(s => s.Key == "sample_data"))
+        {
+            log.LogInformation("Sample data already loaded");
+            await SampleCustody.RunAsync(db, log);   // added later: runs once on databases that already have the sample orders
+            return;
+        }
+        var password = cfg["Seed:SamplePassword"];
+        if (Passwords.Problem(password, "driver01") is { } p) { log.LogWarning("Sample data skipped: Seed__SamplePassword refused ({Problem})", p); return; }
         var admin = await db.Users.Where(u => u.Role == Role.Admin).OrderBy(u => u.CreatedAt).FirstAsync();
         log.LogWarning("Loading sample data into company {Company}…", company.Name);
 
@@ -172,6 +177,7 @@ public static class SampleData
         }
         db.Settings.Add(new Setting { Key = "sample_data", Value = DateTimeOffset.UtcNow.ToString("o") });
         await db.SaveChangesAsync();
+        await SampleCustody.RunAsync(db, log);
         log.LogWarning("Sample data loaded: {Trips} orders, {Drivers} drivers, {Vehicles} vehicles. Driver accounts driver01–driver10 and supervisor1 use Seed__SamplePassword.", plans.Count, drivers.Length, vehicles.Length);
     }
 
