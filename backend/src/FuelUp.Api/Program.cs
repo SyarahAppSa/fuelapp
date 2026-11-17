@@ -30,7 +30,18 @@ if (!env.IsDevelopment() && cfg.GetValue<bool>("Seed:Demo") && !cfg.GetValue<boo
     throw new InvalidOperationException("Demo data (with a published password) is refused outside Development. Set Seed__Demo=false.");
 
 string? Cs(string name) => cfg.GetConnectionString(name) is { Length: > 0 } v ? v : null;
-var runtimeCs = Cs("Default") ?? throw new InvalidOperationException("ConnectionStrings__Default is not set.");
+// Managed hosting (e.g. Render) hands over the database as separate host/port/name/user/password variables.
+string? FromParts()
+{
+    if (cfg["Database:Host"] is not { Length: > 0 } host) return null;
+    return new Npgsql.NpgsqlConnectionStringBuilder
+    {
+        Host = host, Port = cfg.GetValue("Database:Port", 5432), Database = cfg["Database:Name"], Username = cfg["Database:User"], Password = cfg["Database:Password"],
+        SslMode = Enum.TryParse<Npgsql.SslMode>(cfg["Database:SslMode"], true, out var ssl) ? ssl : Npgsql.SslMode.Prefer,
+        MaxPoolSize = cfg.GetValue("Database:PoolMax", 40), Timeout = 15,
+    }.ConnectionString;
+}
+var runtimeCs = Cs("Default") ?? FromParts() ?? throw new InvalidOperationException("ConnectionStrings__Default (or Database__Host/Name/User/Password) is not set.");
 
 // ── Database: runtime role (least privilege, row-level security applies) + owner role for migrations ───────────
 builder.Services.AddScoped<TenantContext>();
@@ -89,11 +100,14 @@ builder.Services.AddRateLimiter(o =>
 
 // X-Forwarded-For is honoured ONLY from configured proxy networks. With an empty list ASP.NET would trust every client,
 // letting an attacker rotate fake IPs to escape the per-IP sign-in limit (found by tests/security.mjs).
+// Platforms such as Render put their own proxy in front and their address ranges are not published: Proxy__TrustedNetworks
+// "0.0.0.0/0,::/0" then trusts that proxy hop, and Proxy__ForwardLimit takes the right-most address(es) the platform added
+// (a client-sent value stays further left and is ignored). Verified after deployment with tests/proxy-ip-check.mjs.
 var trustedNetworks = (cfg["Proxy:TrustedNetworks"] ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 builder.Services.Configure<ForwardedHeadersOptions>(o =>
 {
     o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-    o.ForwardLimit = 1;   // only the reverse proxy in front of us; a client cannot spoof its IP through extra headers
+    o.ForwardLimit = cfg.GetValue("Proxy:ForwardLimit", 1);   // only the proxy hops in front of us; a client cannot spoof its IP through extra headers
     o.KnownNetworks.Clear(); o.KnownProxies.Clear();   // trust X-Forwarded-For only from the configured proxy networks (not even loopback by default)
     foreach (var n in trustedNetworks)
         o.KnownNetworks.Add(Microsoft.AspNetCore.HttpOverrides.IPNetwork.Parse(n));
@@ -146,7 +160,12 @@ app.UseExceptionHandler(e => e.Run(async ctx =>
 }));
 if (!env.IsDevelopment()) app.UseHsts();
 
-// Security headers for every API answer.
+// The dashboard can be served by the API itself (single service on platforms such as Render): wwwroot holds the React build.
+var spa = File.Exists(Path.Combine(app.Environment.WebRootPath ?? Path.Combine(AppContext.BaseDirectory, "wwwroot"), "index.html"));
+static bool IsApi(PathString p) => p.StartsWithSegments("/api") || p.StartsWithSegments("/health") || p.StartsWithSegments("/swagger");
+const string SpaCsp = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+
+// Security headers for every answer: strict for the API, a page policy (same as the nginx setup) for the dashboard.
 app.Use(async (ctx, next) =>
 {
     var h = ctx.Response.Headers;
@@ -155,13 +174,27 @@ app.Use(async (ctx, next) =>
     h["Referrer-Policy"] = "no-referrer";
     h["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
     h["Cross-Origin-Resource-Policy"] = "same-origin";
-    if (!ctx.Request.Path.StartsWithSegments("/swagger"))
+    if (IsApi(ctx.Request.Path))
     {
-        h.ContentSecurityPolicy = "default-src 'none'; frame-ancestors 'none'";
-        h.CacheControl = "no-store";
+        if (!ctx.Request.Path.StartsWithSegments("/swagger")) { h.ContentSecurityPolicy = "default-src 'none'; frame-ancestors 'none'"; h.CacheControl = "no-store"; }
+    }
+    else
+    {
+        h.ContentSecurityPolicy = SpaCsp;
+        h["Cross-Origin-Opener-Policy"] = "same-origin";
     }
     await next();
 });
+if (spa)
+{
+    app.UseDefaultFiles();
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        // hashed assets can be cached for a year; index.html must always be revalidated so a new deploy is picked up
+        OnPrepareResponse = c => c.Context.Response.Headers.CacheControl =
+            c.Context.Request.Path.StartsWithSegments("/assets") ? "public, max-age=31536000, immutable" : "no-cache",
+    });
+}
 
 if (env.IsDevelopment() || cfg.GetValue<bool>("Swagger:Enabled")) { app.UseSwagger(); app.UseSwaggerUI(); }
 app.UseCors();
@@ -186,6 +219,14 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous().DisableRateLimiting();                     // liveness
 app.MapGet("/health/ready", (FuelUpDb db) => Readiness.CheckAsync(db, cfg)).AllowAnonymous().DisableRateLimiting();      // readiness (deploy smoke test, monitoring)
+if (spa)   // client-side routes (/trips, /users…) get the dashboard page; unknown /api paths stay a JSON 404
+    app.MapFallback(async ctx =>
+    {
+        if (IsApi(ctx.Request.Path)) { ctx.Response.StatusCode = 404; await ctx.Response.WriteAsJsonAsync(new { error = "غير موجود." }); return; }
+        ctx.Response.ContentType = "text/html; charset=utf-8";
+        ctx.Response.Headers.CacheControl = "no-cache";
+        await ctx.Response.SendFileAsync(Path.Combine(app.Environment.WebRootPath!, "index.html"));
+    }).AllowAnonymous().DisableRateLimiting();
 app.Run();
 
 public partial class Program;
