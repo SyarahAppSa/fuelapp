@@ -179,6 +179,41 @@ class Api {
   }
 }
 
+
+extension FillReportApi on Api {
+  /// One fill-report photo. [clientId] makes the upload safe to repeat after a network loss (the server keeps one copy).
+  Future<Map<String, dynamic>> uploadFillPhoto(String reportId, Uint8List bytes,
+      {required String kind, required String clientId, required DateTime capturedAt, double? lat, double? lng, String? locationNote}) async {
+    Future<http.Response> call() async {
+      final req = http.MultipartRequest('POST', Uri.parse('$apiBase/api/fill-reports/$reportId/photos'))
+        ..headers['Authorization'] = 'Bearer $_access'
+        ..fields['kind'] = kind
+        ..fields['clientId'] = clientId
+        ..fields['capturedAt'] = capturedAt.toUtc().toIso8601String()
+        ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: 'photo.jpg', contentType: MediaType('image', 'jpeg')));
+      if (lat != null && lng != null) {
+        req.fields['lat'] = '$lat';
+        req.fields['lng'] = '$lng';
+      } else if (locationNote != null) {
+        req.fields['locationNote'] = locationNote;
+      }
+      return http.Response.fromStream(await req.send().timeout(const Duration(seconds: 60)));
+    }
+
+    return await _send(call) as Map<String, dynamic>;
+  }
+
+  /// A protected photo (bytes), loaded with the driver's own session.
+  Future<Uint8List> photoBytes(String attachmentId) async {
+    Future<http.Response> call() => http.get(Uri.parse('$apiBase/api/attachments/$attachmentId'), headers: _headers);
+    if (_access == null) await _tryRefresh();
+    var r = await call();
+    if (r.statusCode == 401 && await _tryRefresh()) r = await call();
+    if (r.statusCode != 200) throw ApiException(r.statusCode, 'تعذر تحميل الصورة.');
+    return r.bodyBytes;
+  }
+}
+
 // ── Models (only the fields the driver app uses) ──────────────────────────────
 
 class Vehicle {

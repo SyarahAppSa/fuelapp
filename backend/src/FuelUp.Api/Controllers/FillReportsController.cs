@@ -57,6 +57,7 @@ public class FillReportsController(FuelUpDb db, ActorAccessor actor, AuditWriter
             return new
             {
                 tripId = t.Id, tripNo = t.No, plate = t.Snapshot?.Plate, customer = t.Snapshot?.CustomerName, site = t.Snapshot?.Site, qtyRequested = t.QtyRequested,
+                product = t.Product, loadingSite = t.Snapshot?.StationName, tripStatus = t.Status.ToString(),
                 report = r is null ? null : new { r.Id, r.No, status = r.Status, stagesDone = StagesDone(r), r.ReviewNote },
             };
         }));

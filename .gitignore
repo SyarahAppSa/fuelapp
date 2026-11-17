@@ -23,3 +23,5 @@ loadtest-result.json
 .vscode/
 .DS_Store
 mobile/test/live/*.jpg
+backend/src/FuelUp.Api/wwwroot/
+tests/.fill-app-flow.json

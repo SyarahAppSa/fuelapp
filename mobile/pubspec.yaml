@@ -12,10 +12,12 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   flutter_secure_storage: ^11.2.0
+  geolocator: ^14.1.2
   http: ^1.2.2
   http_parser: ^4.0.2
   image_picker: ^1.1.2
   intl: any
+  path_provider: ^2.1.6
 
 dev_dependencies:
   flutter_test:

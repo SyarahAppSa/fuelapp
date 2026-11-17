@@ -11,6 +11,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fuelup_driver/fill/outbox.dart';
 import 'package:fuelup_driver/main.dart';
 import 'package:image_picker_platform_interface/image_picker_platform_interface.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
@@ -37,6 +38,7 @@ void main() {
   testWidgets('driver completes an order in the app and the server records it', (tester) async {
     HttpOverrides.global = null;                       // real network to the FuelUp server
     FlutterSecureStorage.setMockInitialValues({});     // device key store (Keychain/Keystore) simulated
+    FillOutbox.autoSync = false;   // no background timer in a widget test
     final camera = FakeCamera();
     ImagePickerPlatform.instance = camera;
     tester.view.physicalSize = const Size(1080, 5200);

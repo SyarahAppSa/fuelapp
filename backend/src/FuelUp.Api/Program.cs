@@ -177,6 +177,9 @@ if (!env.IsDevelopment()) app.UseHsts();
 // The dashboard can be served by the API itself (single service on platforms such as Render): wwwroot holds the React build.
 var spa = File.Exists(Path.Combine(app.Environment.WebRootPath ?? Path.Combine(AppContext.BaseDirectory, "wwwroot"), "index.html"));
 static bool IsApi(PathString p) => p.StartsWithSegments("/api") || p.StartsWithSegments("/health") || p.StartsWithSegments("/swagger");
+// The driver app's browser build (Flutter) lives under /driver: it needs WebAssembly, the camera and the location for «تقرير التعبئة».
+static bool IsDriverApp(PathString p) => p.StartsWithSegments("/driver");
+const string DriverCsp = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
 const string SpaCsp = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
 
 // Security headers for every answer: strict for the API, a page policy (same as the nginx setup) for the dashboard.
@@ -186,7 +189,7 @@ app.Use(async (ctx, next) =>
     h.XContentTypeOptions = "nosniff";
     h.XFrameOptions = "DENY";
     h["Referrer-Policy"] = "no-referrer";
-    h["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+    h["Permissions-Policy"] = IsDriverApp(ctx.Request.Path) ? "camera=(self), microphone=(), geolocation=(self)" : "camera=(), microphone=(), geolocation=()";
     h["Cross-Origin-Resource-Policy"] = "same-origin";
     if (IsApi(ctx.Request.Path))
     {
@@ -194,7 +197,7 @@ app.Use(async (ctx, next) =>
     }
     else
     {
-        h.ContentSecurityPolicy = SpaCsp;
+        h.ContentSecurityPolicy = IsDriverApp(ctx.Request.Path) ? DriverCsp : SpaCsp;
         h["Cross-Origin-Opener-Policy"] = "same-origin";
     }
     await next();
@@ -239,7 +242,8 @@ if (spa)   // client-side routes (/trips, /users…) get the dashboard page; unk
         if (IsApi(ctx.Request.Path)) { ctx.Response.StatusCode = 404; await ctx.Response.WriteAsJsonAsync(new { error = "غير موجود." }); return; }
         ctx.Response.ContentType = "text/html; charset=utf-8";
         ctx.Response.Headers.CacheControl = "no-cache";
-        await ctx.Response.SendFileAsync(Path.Combine(app.Environment.WebRootPath!, "index.html"));
+        var driverPage = Path.Combine(app.Environment.WebRootPath!, "driver", "index.html");
+        await ctx.Response.SendFileAsync(IsDriverApp(ctx.Request.Path) && File.Exists(driverPage) ? driverPage : Path.Combine(app.Environment.WebRootPath!, "index.html"));
     }).AllowAnonymous().DisableRateLimiting();
 app.Run();
 

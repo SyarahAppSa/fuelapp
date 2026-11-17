@@ -1,10 +1,23 @@
-# Single image for Render (or any container host): the API also serves the React dashboard from wwwroot.
+# Single image for Render (or any container host): the API also serves the React dashboard from wwwroot
+# and the driver app's browser build under /driver/.
 FROM node:20-alpine AS web
 WORKDIR /web
 COPY web/package*.json ./
 RUN npm ci
 COPY web/ .
 RUN npm run build
+
+# Driver app (Flutter) for phones' browsers, same pinned SDK as the mobile builds
+FROM debian:bookworm-slim AS driver
+RUN apt-get update && apt-get install -y --no-install-recommends git curl unzip xz-utils ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+RUN git clone --depth 1 -b 3.50.0 https://github.com/flutter/flutter.git /flutter
+ENV PATH=/flutter/bin:$PATH
+WORKDIR /mobile
+COPY mobile/ .
+RUN flutter config --no-analytics && flutter pub get \
+ && flutter build web --release --base-href /driver/ --no-web-resources-cdn --dart-define=API_URL= \
+ && find build/web -name "*.map" -delete
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS api
 WORKDIR /src
@@ -15,6 +28,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
 COPY --from=api /out .
 COPY --from=web /web/dist ./wwwroot
+COPY --from=driver /mobile/build/web ./wwwroot/driver
 COPY deploy/render/entrypoint.sh /entrypoint.sh
 # no secrets or development settings in the image: everything comes from the platform's environment variables
 RUN rm -f appsettings.Development.json && chmod +x /entrypoint.sh && mkdir -p /data/files /data/keys && chown -R app:app /data

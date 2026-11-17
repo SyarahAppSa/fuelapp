@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../theme.dart';
+import '../fill/fill_screen.dart';
+import '../fill/outbox.dart';
 import 'login.dart';
 import 'trip.dart';
 
@@ -48,6 +50,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _signOut() async {
+    await FillOutbox.instance.sync();
+    if (FillOutbox.instance.pending > 0 && mounted) {
+      final go = await showDialog<bool>(context: context, builder: (_) => AlertDialog(title: const Text('تقارير لم تُرسل بعد'), content: Text('على الجهاز ${FillOutbox.instance.pending} عنصر بانتظار المزامنة. الخروج يحذفها.'), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('بقاء')), TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('خروج وحذف'))]));
+      if (go != true) return;
+    }
+    await FillOutbox.instance.clear();
     await Api.instance.logout();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginScreen()), (_) => false);
@@ -88,6 +96,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final mine = _trips.where((t) => t.status == 'WaitingLoad').toList();
     final past = _trips.where((t) => !t.isOpen).toList();
     final pages = [
+      const FillReportsTab(),
       _TripList(trips: current, empty: 'لا يوجد طلب جارٍ الآن.', onTap: _open),
       _TripList(trips: mine, empty: 'لا توجد طلبات جديدة مسندة إليك.', onTap: _open),
       _TripList(trips: past, empty: 'لا توجد طلبات سابقة.', onTap: _open),
@@ -103,7 +112,9 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: RefreshIndicator(
         onRefresh: _load,
-        child: _loading && _me == null
+        child: _tab == 0
+            ? pages[0]
+            : _loading && _me == null
             ? const Center(child: CircularProgressIndicator())
             : _error != null
                 ? ListView(children: [Padding(padding: const EdgeInsets.all(24), child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)))])
@@ -113,6 +124,7 @@ class _HomeScreenState extends State<HomeScreen> {
         selectedIndex: _tab,
         onDestinationSelected: (i) => setState(() => _tab = i),
         destinations: [
+          const NavigationDestination(icon: Icon(Icons.fact_check_outlined), label: 'تقرير التعبئة'),
           NavigationDestination(icon: Badge(isLabelVisible: current.isNotEmpty, child: const Icon(Icons.local_shipping_outlined)), label: 'الطلب الجاري'),
           NavigationDestination(icon: Badge(isLabelVisible: mine.isNotEmpty, label: Text('${mine.length}'), child: const Icon(Icons.assignment_outlined)), label: 'طلباتي'),
           const NavigationDestination(icon: Icon(Icons.history), label: 'السابقة'),
