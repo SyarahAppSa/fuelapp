@@ -23,4 +23,7 @@
     <ProjectReference Include="..\FuelUp.Domain\FuelUp.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="SampleMedia\*.jpg" />
+  </ItemGroup>
 </Project>

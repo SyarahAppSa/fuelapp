@@ -25,6 +25,7 @@ public static class SampleData
         {
             log.LogInformation("Sample data already loaded");
             await SampleCustody.RunAsync(db, log);   // added later: runs once on databases that already have the sample orders
+            await SampleFillReports.RunAsync(db, cfg, log);
             return;
         }
         var password = cfg["Seed:SamplePassword"];
@@ -178,11 +179,12 @@ public static class SampleData
         db.Settings.Add(new Setting { Key = "sample_data", Value = DateTimeOffset.UtcNow.ToString("o") });
         await db.SaveChangesAsync();
         await SampleCustody.RunAsync(db, log);
+        await SampleFillReports.RunAsync(db, cfg, log);
         log.LogWarning("Sample data loaded: {Trips} orders, {Drivers} drivers, {Vehicles} vehicles. Driver accounts driver01–driver10 and supervisor1 use Seed__SamplePassword.", plans.Count, drivers.Length, vehicles.Length);
     }
 
     /// <summary>Moves an order's timestamps to its planned time (the workflow ran "now"); meter readings and audit rows stay append-only.</summary>
-    private static async Task Backdate(FuelUpDb db, Guid id, DateTimeOffset at, int stage)
+    internal static async Task Backdate(FuelUpDb db, Guid id, DateTimeOffset at, int stage)
     {
         var t = await db.Trips.Include(x => x.Loading).Include(x => x.Deliveries).FirstAsync(x => x.Id == id);
         t.CreatedAt = at.AddMinutes(-90);
