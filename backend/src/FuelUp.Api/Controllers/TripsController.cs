@@ -151,6 +151,15 @@ public class DashboardController(FuelUpDb db, ActorAccessor actor, TripService s
             byCustomer = recon.GroupBy(x => x.t.Snapshot?.CustomerName ?? "").Select(g => new { label = g.Key, value = g.Sum(x => x.c.Delivered ?? 0) }).OrderByDescending(x => x.value),
             byDriver = period.GroupBy(t => t.Snapshot?.DriverName ?? "").Select(g => new { label = g.Key, value = g.Sum(t => t.Loading!.Qty) }).OrderByDescending(x => x.value).Take(6),
             monthly = months,
+            counts = new
+            {
+                customers = await db.Customers.CountAsync(), stations = await db.Stations.CountAsync(),
+                vehicles = await db.Vehicles.CountAsync(), drivers = await db.Drivers.CountAsync(),
+            },
+            // trips created in the period, by status (for the status donut)
+            byStatus = all.Concat(await db.Trips.Where(t => t.Status == TripStatus.Cancelled).ToListAsync())
+                .Where(t => Ksa.Day(t.CreatedAt) >= f && Ksa.Day(t.CreatedAt) <= e)
+                .GroupBy(t => t.Status).Select(g => new { status = g.Key.ToString(), label = TripWorkflow.Label(g.Key), value = g.Count() }).OrderByDescending(x => x.value),
         });
     }
 }

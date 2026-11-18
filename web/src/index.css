@@ -140,3 +140,27 @@ input, select, textarea { border: 1px solid var(--line); background: var(--surfa
   .tblw { overflow: visible }
   .labels { grid-template-columns: repeat(3, 1fr); gap: 4mm }
 }
+
+/* dashboard (cards with round icons, ranked bars, donut with legend) */
+.dash-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px }
+.range { display: flex; align-items: center; gap: 8px } .range input { width: auto; border-radius: 99px; padding: 8px 14px; font-weight: 700; background: var(--surface); box-shadow: var(--shadow); border-color: transparent }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0) }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px }
+@media (max-width: 1100px) { .stats { grid-template-columns: repeat(2, 1fr) } } @media (max-width: 640px) { .stats { grid-template-columns: 1fr } }
+.stat { display: flex; align-items: center; gap: 18px; background: var(--surface); border: 0; border-radius: 20px; box-shadow: var(--shadow); padding: 22px 24px; text-align: start; cursor: pointer; color: var(--ink); font: inherit; transition: transform .15s, box-shadow .15s }
+.stat:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(18,22,58,.05), 0 14px 34px rgba(18,22,58,.10) } .stat:disabled { cursor: default }
+.stat-ic { flex: none; width: 74px; height: 74px; border-radius: 50%; display: grid; place-items: center; background: var(--brand-soft); color: var(--brand) }
+.stat-tx { display: flex; flex-direction: column; gap: 4px; min-width: 0 } .stat-l { font-weight: 700; color: var(--ink-2); font-size: 15px }
+.stat-v { font-family: var(--f-num); font-size: 27px; font-weight: 800; line-height: 1.2 } .stat-v small { font-size: 12px; font-weight: 600; color: var(--ink-3) }
+.alerts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 16px } @media (max-width: 900px) { .alerts { grid-template-columns: repeat(2, 1fr) } }
+.alert { display: flex; justify-content: space-between; align-items: center; gap: 8px; background: var(--surface); border: 0; border-radius: 14px; box-shadow: var(--shadow); padding: 12px 16px; font: inherit; color: var(--ink-2); font-weight: 700; cursor: pointer; text-align: start }
+.alert b { font-size: 20px; color: var(--ink) } .alert.warn { box-shadow: var(--shadow), inset 0 0 0 1.5px var(--warn) } .alert.warn b { color: var(--warn) } .alert.crit { box-shadow: var(--shadow), inset 0 0 0 1.5px var(--crit) } .alert.crit b { color: var(--crit) }
+.charts2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px } @media (max-width: 1000px) { .charts2 { grid-template-columns: 1fr } }
+.charts2 .card, .card.chart { border-radius: 20px; padding: 18px 20px } .charts2 h2, .card.chart h2 { font-size: 18px; margin: 0 0 12px }
+.donut { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 8px } @media (max-width: 560px) { .donut { grid-template-columns: 1fr } }
+.donut-chart { position: relative } .donut-c { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; pointer-events: none } .donut-c b { font-size: 26px } .donut-c span { color: var(--ink-3); font-size: 12px }
+.legend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px } .legend li { display: flex; align-items: center; gap: 10px; font-weight: 700 } .legend i { width: 14px; height: 14px; border-radius: 50%; flex: none }
+.toplist .tl-row { display: grid; grid-template-columns: minmax(120px, 38%) 1fr; align-items: center; gap: 14px; padding: 9px 0 }
+.tl-name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap } .tl-track { background: var(--surface-2); border-radius: 99px; height: 30px; overflow: hidden; display: flex; justify-content: flex-end }
+.tl-bar { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--hero-a), var(--hero-b) 70%, var(--hero-c)); display: flex; align-items: center; padding: 0 12px; color: #fff; direction: ltr; justify-content: flex-start }
+.tl-bar b { font-size: 13px; white-space: nowrap }
