@@ -33,7 +33,7 @@ public class ActorAccessor(IHttpContextAccessor http, FuelUpDb db, TenantContext
         tenant.Set(u.CompanyId);
         var levels = await db.UserPermissions.Where(x => x.UserId == uid).ToDictionaryAsync(x => x.Section, x => x.Level);
         // A management account that skipped two-step verification gets no management rights.
-        if (!session.MfaVerified && MfaService.IsRequired(u.Role, levels)) throw new UnauthorizedAccessException();
+        if (!session.MfaVerified && !MfaService.IsExempt(u.Username) && MfaService.IsRequired(u.Role, levels)) throw new UnauthorizedAccessException();
         return _actor = new Actor(u.Id, u.DriverId, levels, u.CompanyId, u.Role, sid);
     }
 }

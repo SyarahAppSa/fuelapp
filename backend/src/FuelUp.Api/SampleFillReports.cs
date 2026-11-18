@@ -30,7 +30,7 @@ public static class SampleFillReports
         var made = 0;
 
         // ── the demo driver's own history ───────────────────────────────────────────────────────────────────────────
-        var demo = await db.Users.FirstOrDefaultAsync(u => u.Username == DemoKit.DriverUser);
+        var demo = await db.Users.FirstOrDefaultAsync(u => u.Username == DemoKit.DriverUser(cfg));
         if (demo?.DriverId is { } demoDriver)
         {
             var audit = new AuditWriter(db); var ledger = new MeterLedger(db); var assign = new AssignmentService(db, audit);

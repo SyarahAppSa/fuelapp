@@ -130,6 +130,8 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 var app = builder.Build();
+if (MfaService.ConfigureExemptions(cfg["Auth:MfaExemptUsers"], cfg["App:Environment"]) is { } mfaWarning) app.Logger.LogError("{Warning}", mfaWarning);
+else if (MfaService.Exempt.Count > 0) app.Logger.LogWarning("Trial environment: two-step verification waived for {Users}", string.Join(", ", MfaService.Exempt));
 
 // ── Start-up: migrate and harden with the owner account, then serve with the restricted runtime account ────────
 {

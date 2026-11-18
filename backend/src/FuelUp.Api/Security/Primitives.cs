@@ -55,7 +55,23 @@ public class MfaService(IDataProtectionProvider dp)
     public const string Issuer = "FuelUp";
 
     /// <summary>Management accounts must use two-step verification.</summary>
-    public static bool IsRequired(User u) => IsRequired(u.Role, u.Permissions.ToDictionary(p => p.Section, p => p.Level));
+    public static bool IsRequired(User u) => !IsExempt(u.Username) && IsRequired(u.Role, u.Permissions.ToDictionary(p => p.Section, p => p.Level));
+
+    /// <summary>
+    /// Trial environments only (App__Environment other than "production"): accounts listed in Auth__MfaExemptUsers sign in with
+    /// username and password alone. Set once at start-up; ignored, with an error in the log, in production.
+    /// </summary>
+    public static IReadOnlySet<string> Exempt { get; private set; } = new HashSet<string>();
+    public static bool IsExempt(string username) => Exempt.Contains(username);
+    public static string? ConfigureExemptions(string? list, string? environment)
+    {
+        var names = (list ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(x => x.ToLowerInvariant()).ToHashSet();
+        if (names.Count == 0) return null;
+        if (string.IsNullOrWhiteSpace(environment) || environment.Equals("production", StringComparison.OrdinalIgnoreCase))
+            return "Auth__MfaExemptUsers is ignored: two-step verification can only be waived in a trial environment (App__Environment).";
+        Exempt = names;
+        return null;
+    }
     public static bool IsRequired(Role role, IReadOnlyDictionary<Section, PermissionLevel> levels) =>
         role is Role.Admin or Role.OpsSupervisor || levels.GetValueOrDefault(Section.Users) == PermissionLevel.Edit;
 

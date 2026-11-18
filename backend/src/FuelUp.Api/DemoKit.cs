@@ -14,12 +14,14 @@ namespace FuelUp.Api;
 /// </summary>
 public static class DemoKit
 {
-    public const string DriverUser = "fuelup_driver_demo", OpsUser = "fuelup_ops_demo";
+    public static string DriverUser(IConfiguration cfg) => (cfg["Demo:DriverUsername"] ?? "fuelup_driver_demo").Trim().ToLowerInvariant();
+    public static string OpsUser(IConfiguration cfg) => (cfg["Demo:OpsUsername"] ?? "fuelup_ops_demo").Trim().ToLowerInvariant();
     private const string Plate = "ت ج ر 2026", MeterSerial = "DEMO-SM-2026";
 
     public static async Task RunAsync(FuelUpDb db, TenantContext tenant, IConfiguration cfg, ILogger log)
     {
         var driverPass = cfg["Demo:DriverPassword"];
+        string DriverUser = DemoKit.DriverUser(cfg), OpsUser = DemoKit.OpsUser(cfg);
         if (string.IsNullOrEmpty(driverPass)) return;
         var opsPass = cfg["Demo:OpsPassword"];
         var reset = cfg.GetValue<bool>("Demo:ResetPasswords");
@@ -77,7 +79,7 @@ public static class DemoKit
             var ops = await db.Users.FirstOrDefaultAsync(u => u.Username == OpsUser);
             if (ops is null)
             {
-                ops = new User { Username = OpsUser, DisplayName = "مراجع العمليات (تجريبي)", Role = Role.OpsSupervisor, PasswordHash = Passwords.Hash(opsPass) };
+                ops = new User { Username = OpsUser, DisplayName = "مراجع الطلبات والتقارير (تجريبي)", Role = Role.OpsSupervisor, PasswordHash = Passwords.Hash(opsPass) };
                 ops.Permissions = Permissions.Presets[Role.OpsSupervisor].Select(kv => new UserPermission { UserId = ops.Id, Section = kv.Key, Level = kv.Value }).ToList();
                 db.Users.Add(ops);
                 log.LogWarning("Demo kit: operations account {User} created", OpsUser);
