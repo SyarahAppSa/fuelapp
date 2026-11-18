@@ -188,6 +188,8 @@ public class Trip : Entity
     public decimal? Rate { get; set; }
     public bool DriverOverride { get; set; }
     public bool SelfInitiated { get; set; }
+    /// <summary>The customer order (طلب العميل) this trip executes. Null for trips created before orders existed.</summary>
+    public Guid? OrderId { get; set; }
     public string? ReviewReason { get; set; }
     public string? Resolution { get; set; }
     public Guid? ApprovedBy { get; set; }
@@ -636,4 +638,101 @@ public class FillReport : Entity
     public DateTimeOffset? ReviewedAt { get; set; }
     public string? ReviewNote { get; set; }
     public decimal? DeliveredQty => MeterBefore is { } b && MeterAfter is { } a && a >= b ? a - b : null;
+}
+
+// ---------- customer orders (طلبات العملاء) ----------
+/// <summary>
+/// «طلب العميل»: the hub that links all departments. One order can need several trucks (trips). Its execution totals are
+/// computed from the trips; Status New/Planned/InProgress/Delivered is derived from them, Closed/Cancelled are manual with a reason.
+/// Money fields are entered by hand for now (a later phase takes them from customer contracts).
+/// </summary>
+public class CustomerOrder : Entity
+{
+    public string No { get; set; } = "";
+    public Guid CustomerId { get; set; }
+    public OrderType Type { get; set; }
+    public string Product { get; set; } = "ديزل";
+    public decimal QtyRequested { get; set; }
+    public OrderPriority Priority { get; set; }
+    public DateTimeOffset? RequestedFrom { get; set; }
+    public DateTimeOffset? RequestedTo { get; set; }
+    public string? CustomerRef { get; set; }
+    public string? Notes { get; set; }
+    public decimal? TransportRatePerLiter { get; set; }
+    public decimal? FuelPricePerLiter { get; set; }
+    public OrderStatus Status { get; set; } = OrderStatus.New;
+    public string? StatusReason { get; set; }
+    public DateTimeOffset? ClosedAt { get; set; }
+    public Guid? ClosedBy { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public Guid CreatedBy { get; set; }
+    /// <summary>Names at creation time (customer may be renamed later).</summary>
+    public string CustomerName { get; set; } = "";
+    public string Site { get; set; } = "";
+}
+
+/// <summary>Per-company, per-month counter for customer order numbers SO-yyMM-0001.</summary>
+public class OrderCounter : ITenantOwned { public Guid CompanyId { get; set; } public string Period { get; set; } = ""; public int Last { get; set; } }
+
+// ---------- fleet documents (وثائق المركبات والسائقين) ----------
+/// <summary>A field shown for a document type: key is one of number, category, issuer, issueDate, expiry, image.</summary>
+public record DocField(string Key, string Label, bool Required);
+
+/// <summary>Kind of document (الفحص الدوري، التأمين، رخصة القيادة…): applies to a vehicle or a driver; mandatory ones block dispatch when expired.</summary>
+public class DocumentType : Entity
+{
+    public string Code { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string AppliesTo { get; set; } = "vehicle";      // vehicle | driver
+    public List<DocField> Fields { get; set; } = new();
+    public bool MandatoryForDispatch { get; set; }
+    public bool IsActive { get; set; } = true;
+    public int SortOrder { get; set; }
+}
+
+/// <summary>
+/// One document of one vehicle or one driver (a driver's licence stays with the driver when his truck changes).
+/// The row holds the current values; every registration and renewal is kept as a <see cref="FleetDocumentVersion"/> (never deleted).
+/// </summary>
+public class FleetDocument : Entity
+{
+    public Guid TypeId { get; set; }
+    public string OwnerKind { get; set; } = "vehicle";      // vehicle | driver
+    public Guid OwnerId { get; set; }
+    public string? Number { get; set; }
+    public string? Category { get; set; }
+    public string? Issuer { get; set; }
+    public DateOnly? IssueDate { get; set; }
+    public DateOnly? Expiry { get; set; }
+    public int Version { get; set; } = 1;
+    public Guid CurrentVersionId { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public Guid CreatedBy { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+/// <summary>Append-only history of a document: the first registration and each renewal. Copies (images/PDF) are attachments of the version.</summary>
+public class FleetDocumentVersion : Entity
+{
+    public Guid DocumentId { get; set; }
+    public int Version { get; set; }
+    public string Kind { get; set; } = "";                   // تسجيل | تجديد
+    public string? Number { get; set; }
+    public string? Category { get; set; }
+    public string? Issuer { get; set; }
+    public DateOnly? IssueDate { get; set; }
+    public DateOnly? Expiry { get; set; }
+    public string? Note { get; set; }
+    public DateTimeOffset At { get; set; } = DateTimeOffset.UtcNow;
+    public Guid ByUserId { get; set; }
+}
+
+/// <summary>Marker of an expiry alert already sent: exactly one per (document, expiry date, offset), so restarts never resend.</summary>
+public class DocumentAlert : Entity
+{
+    public Guid DocumentId { get; set; }
+    public DateOnly Expiry { get; set; }
+    public int OffsetDays { get; set; }
+    public DateTimeOffset SentAt { get; set; }
+    public int Recipients { get; set; }
 }

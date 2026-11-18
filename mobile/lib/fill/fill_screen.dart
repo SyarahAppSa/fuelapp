@@ -109,6 +109,7 @@ class _FillReportsTabState extends State<FillReportsTab> {
             if (waiting) const _Chip('بانتظار المزامنة', Brand.warn) else if (status != null) _Chip(reportStatusLabel[status] ?? status, reportStatusColor(status)),
           ]),
           const SizedBox(height: 4),
+          if (row['orderNo'] != null) Text('طلب العميل ${row['orderNo']}${row['customerRef'] != null ? ' · أمر الشراء ${row['customerRef']}' : ''}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
           Text('${row['customer'] ?? ''} — ${row['site'] ?? ''}'),
           Text('الكمية المطلوبة ${fmt(row['qtyRequested'] as num?)} لتر${started ? ' · المراحل $done/4' : ''}', style: const TextStyle(fontSize: 13)),
           if (rep?['reviewNote'] != null && status == 'Returned') Padding(padding: const EdgeInsets.only(top: 6), child: Text('ملاحظة العمليات: ${rep!['reviewNote']}', style: const TextStyle(color: Brand.crit))),
@@ -235,6 +236,7 @@ class _FillReportScreenState extends State<FillReportScreen> {
     return {
       'no': s?['no'], 'tripNo': s?['tripNo'] ?? h['tripNo'], 'plate': s?['plate'] ?? h['plate'], 'trailerPlate': s?['trailerPlate'],
       'customer': s?['customerName'] ?? h['customer'], 'site': s?['deliverySite'] ?? h['site'], 'loadingSite': s?['loadingSite'] ?? h['loadingSite'],
+      'orderNo': s?['orderNo'] ?? h['orderNo'], 'customerRef': s?['customerRef'] ?? h['customerRef'],
       'product': s?['product'] ?? h['product'], 'requested': s?['quantities']?['requested'] ?? h['qtyRequested'], 'driver': s?['driver'],
     };
   }
@@ -428,6 +430,7 @@ class _FillReportScreenState extends State<FillReportScreen> {
           const SizedBox(height: 4),
           Text('${i['plate'] ?? ''}${i['trailerPlate'] != null ? '  ·  مقطورة ${i['trailerPlate']}' : ''}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
           Text('${i['customer'] ?? ''}'),
+          if (i['orderNo'] != null) Text('طلب العميل ${i['orderNo']}${i['customerRef'] != null ? ' · أمر الشراء ${i['customerRef']}' : ''}', style: const TextStyle(fontWeight: FontWeight.w700)),
           Text('من ${i['loadingSite'] ?? '—'} إلى ${i['site'] ?? '—'}'),
           Text('${i['product'] ?? ''} · المطلوب ${fmt(i['requested'] as num?)} لتر'),
           if (d != null) Text('السائق ${d['name']} · الهوية ${d['nationalId'] ?? '—'} · الجوال ${d['phone'] ?? '—'}', style: const TextStyle(fontSize: 12)),

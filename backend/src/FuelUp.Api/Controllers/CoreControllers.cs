@@ -156,7 +156,7 @@ public class AttachmentsController(FuelUpDb db, ActorAccessor actor, FileStore s
 {
     public const long MaxBytes = 10 * 1024 * 1024;
     private static readonly HashSet<string> Kinds = ["load-doc", "meter-start", "meter-end", "seals", "unload-meter-before", "unload-meter-after", "receipt", "baseline", "other",
-        "part-photo", "invoice", "receipt-voucher", "work-order", "handover", "inspection"];
+        "part-photo", "invoice", "receipt-voucher", "work-order", "handover", "inspection", "document"];
 
     /// <summary>
     /// Upload one photo or PDF for an operation. The server checks: the caller may act on that operation, size ≤ 10 MB,
@@ -164,7 +164,7 @@ public class AttachmentsController(FuelUpDb db, ActorAccessor actor, FileStore s
     /// The SHA-256 fingerprint flags a picture already used on another operation.
     /// </summary>
     [HttpPost, RequestSizeLimit(MaxBytes + 64 * 1024), RequestFormLimits(MultipartBodyLengthLimit = MaxBytes + 64 * 1024), EnableRateLimiting("upload")]
-    public async Task<IActionResult> Upload([FromForm] IFormFile file, [FromForm, Required, RegularExpression("^(trip|part|workorder|transfer)$")] string ownerType, [FromForm] Guid ownerId,
+    public async Task<IActionResult> Upload([FromForm] IFormFile file, [FromForm, Required, RegularExpression("^(trip|part|workorder|transfer|docversion)$")] string ownerType, [FromForm] Guid ownerId,
         [FromForm, Required, StringLength(40)] string kind, [FromForm] DateTimeOffset? capturedAt, [FromForm, Range(-90, 90)] double? lat, [FromForm, Range(-180, 180)] double? lng)
     {
         var a = await actor.GetAsync();
@@ -189,6 +189,8 @@ public class AttachmentsController(FuelUpDb db, ActorAccessor actor, FileStore s
             Lat = lat, Lng = lng, ByUserId = a.UserId,
         };
         db.Attachments.Add(att);
+        if (ownerType == "docversion" && await db.DocumentVersions.Where(v => v.Id == ownerId).Select(v => new { v.DocumentId, v.Version }).FirstOrDefaultAsync() is { } dv)
+            db.Audit.Add(new AuditEntry { At = DateTimeOffset.UtcNow, UserId = a.UserId, Entity = "document", EntityId = dv.DocumentId, Action = "إرفاق نسخة الوثيقة", Detail = $"الإصدار {dv.Version} · {safeName}" });
         await db.SaveChangesAsync();
         return Ok(new { att.Id, att.Sha256, att.FromGallery, duplicateOf });
     }
@@ -220,6 +222,12 @@ public class AttachmentsController(FuelUpDb db, ActorAccessor actor, FileStore s
         {
             var rep = await db.FillReports.Where(x => x.Id == ownerId).Select(x => new { x.DriverId }).FirstOrDefaultAsync() ?? throw new NotFoundException("التقرير");
             if (!(a.Can(Section.Driver, PermissionLevel.Edit) && a.DriverId == rep.DriverId) && !a.Can(Section.FillReports, write ? PermissionLevel.Edit : PermissionLevel.View)) throw new ForbiddenException();
+            return;
+        }
+        if (ownerType == "docversion")   // copy of a fleet document version: images only for Documents:View, uploads for Documents:Edit
+        {
+            if (!await db.DocumentVersions.AnyAsync(x => x.Id == ownerId)) throw new NotFoundException("الوثيقة");
+            a.Require(Section.Documents, write ? PermissionLevel.Edit : PermissionLevel.View);
             return;
         }
         if (ownerType is "part" or "workorder" or "transfer")   // custody documents: part photo, invoice, receipt voucher, work order, signed hand-over

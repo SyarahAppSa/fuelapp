@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FuelUp.Api.Controllers;
 
-public record TripView(Trip Trip, Reconciliation Reconciliation, string StatusLabel);
+public record TripView(Trip Trip, Reconciliation Reconciliation, string StatusLabel, string? OrderNo = null, string? CustomerRef = null);
 public record NoteRequest([StringLength(1000)] string? Note);
 public record AckRequest(bool Confirmed, [StringLength(1000)] string? Note);
 public record CorrectionRequest([Required, StringLength(20)] string Field, [Required, StringLength(60)] string NewValue, [Required, StringLength(1000)] string Reason);
@@ -18,7 +18,11 @@ public record PagedResult<T>(IReadOnlyList<T> Items, int Total, int Page, int Si
 [ApiController, Route("api/trips"), Authorize]
 public class TripsController(FuelUpDb db, ActorAccessor actor, TripService svc) : ControllerBase
 {
-    private async Task<TripView> View(Trip t) => new(t, Reconciliation.Of(t, await svc.ToleranceAsync()), TripWorkflow.Label(t.Status));
+    private async Task<TripView> View(Trip t)
+    {
+        var o = t.OrderId is { } oid ? await db.Orders.Where(x => x.Id == oid).Select(x => new { x.No, x.CustomerRef }).FirstOrDefaultAsync() : null;
+        return new(t, Reconciliation.Of(t, await svc.ToleranceAsync()), TripWorkflow.Label(t.Status), o?.No, o?.CustomerRef);
+    }
 
     [HttpGet]
     public async Task<IActionResult> List([FromQuery] TripStatus? status, [FromQuery] Guid? driverId, [FromQuery] int page = 1, [FromQuery] int size = 20)
@@ -31,7 +35,13 @@ public class TripsController(FuelUpDb db, ActorAccessor actor, TripService svc) 
         var total = await q.CountAsync();
         var items = await q.OrderByDescending(t => t.CreatedAt).Skip((Math.Max(page, 1) - 1) * size).Take(Math.Clamp(size, 1, 100)).ToListAsync();
         var tol = await svc.ToleranceAsync();
-        return Ok(new PagedResult<TripView>(items.Select(t => new TripView(t, Reconciliation.Of(t, tol), TripWorkflow.Label(t.Status))).ToList(), total, page, size));
+        var oids = items.Where(t => t.OrderId != null).Select(t => t.OrderId!.Value).Distinct().ToList();
+        var orders = await db.Orders.Where(o => oids.Contains(o.Id)).ToDictionaryAsync(o => o.Id, o => new { o.No, o.CustomerRef });
+        return Ok(new PagedResult<TripView>(items.Select(t =>
+        {
+            var o = t.OrderId is { } oid ? orders.GetValueOrDefault(oid) : null;
+            return new TripView(t, Reconciliation.Of(t, tol), TripWorkflow.Label(t.Status), o?.No, o?.CustomerRef);
+        }).ToList(), total, page, size));
     }
 
     [HttpGet("{id:guid}")]

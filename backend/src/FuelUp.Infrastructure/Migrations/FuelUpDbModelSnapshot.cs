@@ -502,6 +502,119 @@ namespace FuelUp.Infrastructure.Migrations
                     b.ToTable("customer_assignments", (string)null);
                 });
 
+            modelBuilder.Entity("FuelUp.Domain.CustomerOrder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("closed_at");
+
+                    b.Property<Guid?>("ClosedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("closed_by");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_id");
+
+                    b.Property<string>("CustomerName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("customer_name");
+
+                    b.Property<string>("CustomerRef")
+                        .HasColumnType("text")
+                        .HasColumnName("customer_ref");
+
+                    b.Property<decimal?>("FuelPricePerLiter")
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("fuel_price_per_liter");
+
+                    b.Property<string>("No")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("no");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("text")
+                        .HasColumnName("notes");
+
+                    b.Property<string>("Priority")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("priority");
+
+                    b.Property<string>("Product")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("product");
+
+                    b.Property<decimal>("QtyRequested")
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("qty_requested");
+
+                    b.Property<DateTimeOffset?>("RequestedFrom")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_from");
+
+                    b.Property<DateTimeOffset?>("RequestedTo")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_to");
+
+                    b.Property<string>("Site")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("site");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.Property<string>("StatusReason")
+                        .HasColumnType("text")
+                        .HasColumnName("status_reason");
+
+                    b.Property<decimal?>("TransportRatePerLiter")
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("transport_rate_per_liter");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id")
+                        .HasName("pk_customer_orders");
+
+                    b.HasIndex("CustomerId")
+                        .HasDatabaseName("ix_customer_orders_customer_id");
+
+                    b.HasIndex("CompanyId", "No")
+                        .IsUnique()
+                        .HasDatabaseName("ix_customer_orders_company_id_no");
+
+                    b.HasIndex("CompanyId", "Status", "CreatedAt")
+                        .HasDatabaseName("ix_customer_orders_company_id_status_created_at");
+
+                    b.ToTable("customer_orders", (string)null);
+                });
+
             modelBuilder.Entity("FuelUp.Domain.DeviceToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -530,6 +643,98 @@ namespace FuelUp.Infrastructure.Migrations
                         .HasName("pk_device_tokens");
 
                     b.ToTable("device_tokens", (string)null);
+                });
+
+            modelBuilder.Entity("FuelUp.Domain.DocumentAlert", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("document_id");
+
+                    b.Property<DateOnly>("Expiry")
+                        .HasColumnType("date")
+                        .HasColumnName("expiry");
+
+                    b.Property<int>("OffsetDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("offset_days");
+
+                    b.Property<int>("Recipients")
+                        .HasColumnType("integer")
+                        .HasColumnName("recipients");
+
+                    b.Property<DateTimeOffset>("SentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_document_alerts");
+
+                    b.HasIndex("DocumentId", "Expiry", "OffsetDays")
+                        .IsUnique()
+                        .HasDatabaseName("ix_document_alerts_document_id_expiry_offset_days");
+
+                    b.ToTable("document_alerts", (string)null);
+                });
+
+            modelBuilder.Entity("FuelUp.Domain.DocumentType", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AppliesTo")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("applies_to");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("code");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("Fields")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("fields");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("MandatoryForDispatch")
+                        .HasColumnType("boolean")
+                        .HasColumnName("mandatory_for_dispatch");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.HasKey("Id")
+                        .HasName("pk_document_types");
+
+                    b.HasIndex("CompanyId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_document_types_company_id_name");
+
+                    b.ToTable("document_types", (string)null);
                 });
 
             modelBuilder.Entity("FuelUp.Domain.Driver", b =>
@@ -770,6 +975,150 @@ namespace FuelUp.Infrastructure.Migrations
                         .HasDatabaseName("ix_fill_reports_company_id_status_started_at");
 
                     b.ToTable("fill_reports", (string)null);
+                });
+
+            modelBuilder.Entity("FuelUp.Domain.FleetDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Category")
+                        .HasColumnType("text")
+                        .HasColumnName("category");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid>("CurrentVersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("current_version_id");
+
+                    b.Property<DateOnly?>("Expiry")
+                        .HasColumnType("date")
+                        .HasColumnName("expiry");
+
+                    b.Property<DateOnly?>("IssueDate")
+                        .HasColumnType("date")
+                        .HasColumnName("issue_date");
+
+                    b.Property<string>("Issuer")
+                        .HasColumnType("text")
+                        .HasColumnName("issuer");
+
+                    b.Property<string>("Number")
+                        .HasColumnType("text")
+                        .HasColumnName("number");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<string>("OwnerKind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("owner_kind");
+
+                    b.Property<Guid>("TypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("type_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_fleet_documents");
+
+                    b.HasIndex("OwnerId")
+                        .HasDatabaseName("ix_fleet_documents_owner_id");
+
+                    b.HasIndex("CompanyId", "Expiry")
+                        .HasDatabaseName("ix_fleet_documents_company_id_expiry");
+
+                    b.HasIndex("CompanyId", "TypeId", "OwnerId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_fleet_documents_company_id_type_id_owner_id");
+
+                    b.ToTable("fleet_documents", (string)null);
+                });
+
+            modelBuilder.Entity("FuelUp.Domain.FleetDocumentVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("At")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("at");
+
+                    b.Property<Guid>("ByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("by_user_id");
+
+                    b.Property<string>("Category")
+                        .HasColumnType("text")
+                        .HasColumnName("category");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("document_id");
+
+                    b.Property<DateOnly?>("Expiry")
+                        .HasColumnType("date")
+                        .HasColumnName("expiry");
+
+                    b.Property<DateOnly?>("IssueDate")
+                        .HasColumnType("date")
+                        .HasColumnName("issue_date");
+
+                    b.Property<string>("Issuer")
+                        .HasColumnType("text")
+                        .HasColumnName("issuer");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("note");
+
+                    b.Property<string>("Number")
+                        .HasColumnType("text")
+                        .HasColumnName("number");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_fleet_document_versions");
+
+                    b.HasIndex("DocumentId", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("ix_fleet_document_versions_document_id_version");
+
+                    b.ToTable("fleet_document_versions", (string)null);
                 });
 
             modelBuilder.Entity("FuelUp.Domain.GpsPoint", b =>
@@ -1101,6 +1450,27 @@ namespace FuelUp.Infrastructure.Migrations
                         .HasDatabaseName("ix_notifications_driver_id_read_at");
 
                     b.ToTable("notifications", (string)null);
+                });
+
+            modelBuilder.Entity("FuelUp.Domain.OrderCounter", b =>
+                {
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("Period")
+                        .HasMaxLength(4)
+                        .HasColumnType("character varying(4)")
+                        .HasColumnName("period");
+
+                    b.Property<int>("Last")
+                        .HasColumnType("integer")
+                        .HasColumnName("last");
+
+                    b.HasKey("CompanyId", "Period")
+                        .HasName("pk_order_counters");
+
+                    b.ToTable("order_counters", (string)null);
                 });
 
             modelBuilder.Entity("FuelUp.Domain.Part", b =>
@@ -1837,6 +2207,10 @@ namespace FuelUp.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("no");
 
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
                     b.Property<string>("Product")
                         .IsRequired()
                         .HasColumnType("text")
@@ -1889,6 +2263,9 @@ namespace FuelUp.Infrastructure.Migrations
 
                     b.HasIndex("DriverId")
                         .HasDatabaseName("ix_trips_driver_id");
+
+                    b.HasIndex("OrderId")
+                        .HasDatabaseName("ix_trips_order_id");
 
                     b.HasIndex("CompanyId", "No")
                         .IsUnique()

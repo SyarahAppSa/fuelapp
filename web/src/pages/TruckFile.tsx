@@ -7,6 +7,7 @@ import { api, fmt, ksa } from '../api'
 import { Field, Panel } from '../ui'
 import { day, money, useMeta, type Movement, type Part } from '../custody'
 import { MovesTable, PartsTable, StatusChip } from './Custody'
+import { DocsPanel } from './Documents'
 
 interface File {
   vehicle: { id: string; plate: string; internalNo?: string; make?: string; model?: string; year?: number; vin?: string; trailerPlate?: string }
@@ -21,6 +22,7 @@ export default function TruckFile() {
   const nav = useNavigate()
   const meta = useMeta()
   const [range, setRange] = useState({ from: '', to: '' })
+  const [tab, setTab] = useState<'file' | 'docs'>('file')
   const qs = new URLSearchParams(Object.entries(range).filter(([, v]) => v)).toString()
   const q = useQuery({ queryKey: ['custody', 'truck', id, qs], queryFn: () => api<File>(`/api/custody/vehicles/${id}?${qs}`) })
   const f = q.data
@@ -42,6 +44,8 @@ export default function TruckFile() {
           <div className="tile"><div>أوامر الصيانة</div><div className="v">{f.workOrders.length}</div><div>مفتوحة {f.workOrders.filter(w => !w.closed).length}</div></div>
         </div>
       </section>
+      <div className="tabs noprint"><button className={tab === 'file' ? 'on' : ''} onClick={() => setTab('file')}>القطع والصيانة</button><button className={tab === 'docs' ? 'on' : ''} onClick={() => setTab('docs')}>الوثائق</button></div>
+      {tab === 'docs' ? <DocsPanel ownerKind="vehicle" ownerId={v.id} /> : <>
       <Panel title="القطع المركّبة حاليًا">
         {[...byCat.entries()].map(([cat, rows]) => (
           <div key={cat}><div className="hd sub" style={{ padding: '8px 14px', fontWeight: 800 }}>{cat} ({rows.length})</div>
@@ -73,6 +77,7 @@ export default function TruckFile() {
         </table></div>
       </Panel>
       <Panel title="كل حركات الشاحنة"><MovesTable rows={f.movements} /></Panel>
+      </>}
       <div className="sub" style={{ marginTop: 8 }}>الحالات: {meta.data?.statuses.map(s => <span key={s.value} style={{ marginInlineEnd: 6 }}><StatusChip s={s.value} label={s.label} /></span>)}</div>
     </>
   )

@@ -218,7 +218,24 @@ public class TripService(FuelUpDb db, MeterLedger meters, AssignmentService assi
         return prefix + n.ToString("0000", CultureInfo.InvariantCulture);
     }
 
-    public async Task<Trip> CreateAsync(Actor a, CreateTrip input, CancellationToken ct = default)
+    /// <summary>Re-derives the status of the customer order a trip belongs to (New → Planned → InProgress → Delivered). Saved by the caller.</summary>
+    public async Task SyncOrderAsync(Actor a, Trip t, CancellationToken ct = default)
+    {
+        if (t.OrderId is not { } oid) return;
+        var o = await db.Orders.FirstOrDefaultAsync(x => x.Id == oid, ct);
+        if (o is null || !OrderRules.IsOpen(o.Status)) return;
+        var trips = await db.Trips.Include(x => x.Loading).Include(x => x.Deliveries).Where(x => x.OrderId == oid && x.Id != t.Id).ToListAsync(ct);
+        trips.Add(t);
+        var s = OrderRules.Derive(o, trips, await ToleranceAsync(ct));
+        if (s == o.Status) return;
+        audit.Write(a, "order", o.Id, "تغيّر حالة الطلب", $"{OrderRules.StatusLabel(o.Status)} ← {OrderRules.StatusLabel(s)} (الرحلة {t.No})", o.Status.ToString(), s.ToString());
+        o.Status = s;
+    }
+
+    public async Task<Trip> CreateAsync(Actor a, CreateTrip input, CancellationToken ct = default) => await CreateAsync(a, input, null, ct);
+
+    /// <summary>Creates a trip; with <paramref name="orderId"/> it is created as part of that customer order (same transaction).</summary>
+    public async Task<Trip> CreateAsync(Actor a, CreateTrip input, Guid? orderId, CancellationToken ct = default)
     {
         a.Require(Section.Ops, PermissionLevel.Edit);
         if (input.QtyRequested <= 0) throw new DomainException("الكمية المطلوبة يجب أن تكون أكبر من صفر.");
@@ -232,11 +249,12 @@ public class TripService(FuelUpDb db, MeterLedger meters, AssignmentService assi
         {
             No = await NextNoAsync(ct), CreatedBy = a.UserId, CustomerId = input.CustomerId, DriverId = driverId, VehicleId = input.VehicleId, StationId = input.StationId,
             SourceRef = input.SourceRef, Product = input.Product, QtyRequested = input.QtyRequested, Eta = input.Eta, Rate = input.Rate,
-            DriverOverride = defaultDriver != null && defaultDriver != driverId,
+            DriverOverride = defaultDriver != null && defaultDriver != driverId, OrderId = orderId,
         };
         if (t.VehicleId is { } v) t.MeterId = await db.Vehicles.Where(x => x.Id == v).Select(x => x.MeterId).FirstOrDefaultAsync(ct);
         t.Snapshot = await SnapshotAsync(t, ct);
         db.Trips.Add(t);
+        await SyncOrderAsync(a, t, ct);
         audit.Write(a, "trip", t.Id, "إنشاء طلب النقل", $"{t.QtyRequested} لتر {t.Product}");
         audit.Notify(driverId, $"طلب جديد {t.No}: {t.Snapshot.CustomerName} · {t.QtyRequested:#,0} لتر {t.Product}", t.No);
         await db.SaveChangesAsync(ct);
@@ -265,6 +283,7 @@ public class TripService(FuelUpDb db, MeterLedger meters, AssignmentService assi
         t.Loading = new TripLoading { TripId = t.Id, Qty = input.Qty, DocNo = input.DocNo, Odometer = input.Odometer, MeterStart = input.MeterStart, MeterEnd = input.MeterEnd, OutletSeals = input.OutletSeals, Location = input.Location, Lat = input.Lat, Lng = input.Lng, At = DateTimeOffset.UtcNow, ByUserId = a.UserId };
         t.Snapshot = await SnapshotAsync(t, ct);
         audit.Write(a, "trip", t.Id, "بدء التنفيذ واعتماد التحميل", $"{input.Qty} لتر · سند {input.DocNo}" + (input.MeterStart is { } s ? $" · عداد {s}←{input.MeterEnd}" : ""));
+        await SyncOrderAsync(a, t, ct);
         await db.SaveChangesAsync(ct);
         if (tx != null) await tx.CommitAsync(ct);
         return t;
@@ -314,6 +333,7 @@ public class TripService(FuelUpDb db, MeterLedger meters, AssignmentService assi
         t.Snapshot = await SnapshotAsync(t, ct);
         audit.Write(a, "trip", t.Id, "تسجيل التسليم", $"عداد {d.MeterQty} لتر · سند {d.Received}");
         if (status != TripStatus.EnRoute) audit.Write(a, "trip", t.Id, status == TripStatus.AwaitingApproval ? "مطابقة سليمة، بانتظار اعتماد المشرف" : "تحويل للمراجعة", reason);
+        await SyncOrderAsync(a, t, ct);
         await db.SaveChangesAsync(ct);
         if (tx != null) await tx.CommitAsync(ct);
         return t;
@@ -346,6 +366,7 @@ public class TripService(FuelUpDb db, MeterLedger meters, AssignmentService assi
         var t = await GetAsync(id, ct);
         TripWorkflow.Move(t, TripStatus.Cancelled);
         audit.Write(a, "trip", t.Id, "إلغاء الطلب", reason); audit.Notify(t.DriverId, $"أُلغي الطلب {t.No}", t.No);
+        await SyncOrderAsync(a, t, ct);
         await db.SaveChangesAsync(ct); return t;
     }
 

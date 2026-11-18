@@ -107,6 +107,7 @@ class _TripScreenState extends State<TripScreen> {
             Text(t.label, style: const TextStyle(fontSize: 13)),
             const SizedBox(height: 4),
             Text(t.customer, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+            if (t.orderNo != null) Text(t.orderLine, style: const TextStyle(fontWeight: FontWeight.w700)),
             Text('${t.station} ← ${t.site}'),
             const SizedBox(height: 8),
             Text('المطلوب ${fmt(t.qtyRequested)} لتر · المحمّل ${fmt(t.rec['loaded'] as num?)} · المسلّم ${fmt(t.rec['delivered'] as num?)}'),

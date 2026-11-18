@@ -25,7 +25,7 @@ public enum AckState { Pending = 0, Confirmed = 1, Disputed = 2 }
 /// <summary>Permission sections, identical to the current FuelUp build.</summary>
 public enum Section
 {
-    Ops, Moves, Approve, Assign, Meters, Tracking, Custody, VehicleFile, Costs, Master, Users, Driver, Export, Attendance, FillReports,
+    Ops, Moves, Approve, Assign, Meters, Tracking, Custody, VehicleFile, Costs, Master, Users, Driver, Export, Attendance, FillReports, Documents,
 }
 
 public enum PermissionLevel { None = 0, View = 1, Edit = 2 }
@@ -40,3 +40,9 @@ public enum PartTracking { Individual, Quantity }
 /// needs a human look (partial/failed unloading, invalid or out-of-tolerance reading), Returned to the driver, Approved.</summary>
 public enum FillReportStatus { Draft, Submitted, NeedsReview, Returned, Approved }
 public enum UnloadOutcome { Full, Partial, Failed }
+
+/// <summary>«طلب العميل»: transport only, or transport and supply of the fuel.</summary>
+public enum OrderType { Transport, TransportAndSupply }
+public enum OrderPriority { Scheduled, Urgent }
+/// <summary>New → Planned → InProgress → Delivered are derived from the order's trips; Closed and Cancelled are set by a person with a reason.</summary>
+public enum OrderStatus { New, Planned, InProgress, Delivered, Closed, Cancelled }

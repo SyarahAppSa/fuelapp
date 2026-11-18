@@ -51,12 +51,15 @@ public class FillReportsController(FuelUpDb db, ActorAccessor actor, AuditWriter
             .OrderByDescending(t => t.CreatedAt).Take(50).ToListAsync();
         var ids = list.Select(t => t.Id).ToList();
         var reports = await db.FillReports.Where(r => ids.Contains(r.TripId)).ToDictionaryAsync(r => r.TripId);
+        var oids = list.Where(t => t.OrderId != null).Select(t => t.OrderId!.Value).Distinct().ToList();
+        var orders = await db.Orders.Where(o => oids.Contains(o.Id)).ToDictionaryAsync(o => o.Id, o => new { o.No, o.CustomerRef });
         return Ok(list.Select(t =>
         {
             var r = reports.GetValueOrDefault(t.Id);
+            var o = t.OrderId is { } oid ? orders.GetValueOrDefault(oid) : null;
             return new
             {
-                tripId = t.Id, tripNo = t.No, plate = t.Snapshot?.Plate, customer = t.Snapshot?.CustomerName, site = t.Snapshot?.Site, qtyRequested = t.QtyRequested,
+                tripId = t.Id, tripNo = t.No, orderNo = o?.No, customerRef = o?.CustomerRef, plate = t.Snapshot?.Plate, customer = t.Snapshot?.CustomerName, site = t.Snapshot?.Site, qtyRequested = t.QtyRequested,
                 product = t.Product, loadingSite = t.Snapshot?.StationName, tripStatus = t.Status.ToString(),
                 report = r is null ? null : new { r.Id, r.No, status = r.Status, stagesDone = StagesDone(r), r.ReviewNote },
             };
@@ -348,9 +351,10 @@ public class FillReportsController(FuelUpDb db, ActorAccessor actor, AuditWriter
         var tol = await trips.ToleranceAsync();
         var history = a.Can(Section.FillReports) ? await db.Audit.Where(x => x.Entity == "fillreport" && x.EntityId == r.Id).OrderBy(x => x.Id).ToListAsync() : [];
         var names = history.Count > 0 ? await db.Users.Select(u => new { u.Id, u.DisplayName }).ToDictionaryAsync(u => u.Id, u => u.DisplayName) : [];
+        var order = await db.Trips.Where(t => t.Id == r.TripId && t.OrderId != null).Join(db.Orders, t => t.OrderId, o => o.Id, (t, o) => new { o.Id, o.No, o.CustomerRef }).FirstOrDefaultAsync();
         return new
         {
-            r.Id, r.No, r.TripId, r.TripNo, status = r.Status, r.StartedAt, r.SubmittedAt,
+            r.Id, r.No, r.TripId, r.TripNo, orderId = order?.Id, orderNo = order?.No, customerRef = order?.CustomerRef, status = r.Status, r.StartedAt, r.SubmittedAt,
             r.Plate, r.TrailerPlate, r.CustomerName, r.DeliverySite, r.LoadingSite, r.Product,
             driver = new { name = r.DriverName, nationalId = seeAll ? driver?.NationalId : Mask(driver?.NationalId), phone = seeAll ? driver?.Phone : Mask(driver?.Phone), masked = !seeAll },
             stages = new
