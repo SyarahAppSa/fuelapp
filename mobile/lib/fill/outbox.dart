@@ -218,10 +218,10 @@ class FillOutbox extends ChangeNotifier {
     return r;
   }
 
-  Future<void> addPhoto(String tripId, Uint8List bytes, {required String kind, double? lat, double? lng, String? locationNote}) async {
+  Future<void> addPhoto(String tripId, Uint8List bytes, {required String kind, DateTime? capturedAt, double? lat, double? lng, String? locationNote}) async {
     final r = report(tripId);
     final old = r.photos[kind];
-    final p = LocalPhoto(kind: kind, clientId: newClientId(), capturedAt: DateTime.now(), lat: lat, lng: lng, locationNote: locationNote);
+    final p = LocalPhoto(kind: kind, clientId: newClientId(), capturedAt: capturedAt ?? DateTime.now(), lat: lat, lng: lng, locationNote: locationNote);
     await DeviceStore.write('${p.clientId}.jpg', bytes);
     // a retake replaces a photo that never left the phone; one already on the server stays there as history
     if (old != null && !old.synced) {

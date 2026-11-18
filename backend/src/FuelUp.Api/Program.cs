@@ -142,6 +142,7 @@ var app = builder.Build();
     if (cfg.GetValue<bool>("Seed:Demo")) await DemoSeeder.RunAsync(owner, tenant);
     await Bootstrap.RunAsync(owner, tenant, cfg, app.Logger);
     await PresetSync.RunAsync(owner, tenant, app.Logger);
+    await DemoKit.RunAsync(owner, tenant, cfg, app.Logger);
     if (Cs("Migrations") is null)
         app.Logger.LogWarning("ConnectionStrings:Migrations is not set: the API runs with the owner role. Use a separate restricted role in production.");
 }

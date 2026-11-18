@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import '../api.dart';
 import '../theme.dart';
 import 'outbox.dart';
+import 'stamp.dart';
 
 const reportStatusLabel = {'Draft': 'قيد التوثيق', 'Submitted': 'تم إرسال التقرير', 'NeedsReview': 'بحاجة إلى مراجعة', 'Returned': 'أُعيد إليك', 'Approved': 'معتمد'};
 Color reportStatusColor(String s) => switch (s) { 'Approved' => Brand.ok, 'NeedsReview' || 'Returned' => Brand.crit, 'Submitted' => Brand.cyan, _ => Brand.brand };
@@ -252,16 +253,35 @@ class _FillReportScreenState extends State<FillReportScreen> {
       if (go != true) return;
     }
     while (true) {
-      final x = await ImagePicker().pickImage(source: ImageSource.camera, imageQuality: 80, maxWidth: 2048, preferredCameraDevice: CameraDevice.rear);
+      // camera only: the app never offers the gallery
+      final x = await ImagePicker().pickImage(source: ImageSource.camera, imageQuality: 85, maxWidth: 1920, preferredCameraDevice: CameraDevice.rear);
       if (x == null || !mounted) return;
-      final bytes = await x.readAsBytes();
+      final at = DateTime.now();
+      final raw = await x.readAsBytes();
       if (!mounted) return;
+      setState(() => _busy = true);
+      final loc = await FillLocation.current();
+      String? note;
+      if (loc == null && mounted) note = await _askLocationReason() ?? 'تعذر تحديد الموقع';
+      Uint8List bytes;
+      try {
+        // date, time and place burnt into the picture itself
+        bytes = await PhotoStamp.apply(raw, [
+          '${slot.label} · ${PhotoStamp.ltr('${_info['tripNo'] ?? ''}')}',
+          'التاريخ والوقت: ${PhotoStamp.when(at)}',
+          loc != null ? 'الموقع: ${PhotoStamp.ltr('${loc.lat.toStringAsFixed(5)}, ${loc.lng.toStringAsFixed(5)}')}' : 'الموقع: غير متاح — $note',
+        ]);
+      } catch (_) {
+        bytes = raw;   // never lose the evidence because the stamp failed; time and place still travel with the upload
+      }
+      if (!mounted) return;
+      setState(() => _busy = false);
       final use = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
         builder: (_) => AlertDialog(
           title: Text(slot.label),
-          content: ConstrainedBox(constraints: const BoxConstraints(maxHeight: 420), child: Image.memory(bytes, fit: BoxFit.contain)),
+          content: ConstrainedBox(constraints: const BoxConstraints(maxHeight: 460), child: Image.memory(bytes, fit: BoxFit.contain)),
           actions: [
             TextButton.icon(onPressed: () => Navigator.pop(context, false), icon: const Icon(Icons.refresh), label: const Text('إعادة التصوير')),
             FilledButton.icon(onPressed: () => Navigator.pop(context, true), icon: const Icon(Icons.check), label: const Text('استخدم الصورة')),
@@ -270,10 +290,7 @@ class _FillReportScreenState extends State<FillReportScreen> {
       );
       if (use == null || !mounted) return;
       if (!use) continue;
-      final loc = await FillLocation.current();
-      String? note;
-      if (loc == null && mounted) note = await _askLocationReason();
-      await ob.addPhoto(widget.tripId, bytes, kind: slot.kind, lat: loc?.lat, lng: loc?.lng, locationNote: note ?? (loc == null ? 'تعذر تحديد الموقع' : null));
+      await ob.addPhoto(widget.tripId, bytes, kind: slot.kind, capturedAt: at, lat: loc?.lat, lng: loc?.lng, locationNote: loc == null ? note : null);
       if (mounted) setState(() => _localError = null);
       return;
     }

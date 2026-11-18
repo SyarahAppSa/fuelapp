@@ -10,6 +10,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fuelup_driver/fill/fill_screen.dart';
@@ -21,6 +22,7 @@ import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 const user = String.fromEnvironment('APP_USER');
 const pass = String.fromEnvironment('APP_PASS');
 const tripNo = String.fromEnvironment('TRIP_NO');
+const photoPath = String.fromEnvironment('PHOTO');
 
 const _jpeg = <int>[255,216,255,224,0,16,74,70,73,70,0,1,1,0,0,1,0,1,0,0,255,219,0,67,0,10,7,7,8,7,6,10,8,8,8,11,10,10,11,14,24,16,14,13,13,14,29,21,22,17,24,35,31,37,36,34,31,34,33,38,43,55,47,38,41,52,41,33,34,48,65,49,52,57,59,62,62,62,37,46,68,73,67,60,72,55,61,62,59,255,219,0,67,1,10,11,11,14,13,14,28,16,16,28,59,40,34,40,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,59,255,192,0,17,8,0,12,0,16,3,1,34,0,2,17,1,3,17,1,255,196,0,31,0,0,1,5,1,1,1,1,1,1,0,0,0,0,0,0,0,0,1,2,3,4,5,6,7,8,9,10,11,255,196,0,181,16,0,2,1,3,3,2,4,3,5,5,4,4,0,0,1,125,1,2,3,0,4,17,5,18,33,49,65,6,19,81,97,7,34,113,20,50,129,145,161,8,35,66,177,193,21,82,209,240,36,51,98,114,130,9,10,22,23,24,25,26,37,38,39,40,41,42,52,53,54,55,56,57,58,67,68,69,70,71,72,73,74,83,84,85,86,87,88,89,90,99,100,101,102,103,104,105,106,115,116,117,118,119,120,121,122,131,132,133,134,135,136,137,138,146,147,148,149,150,151,152,153,154,162,163,164,165,166,167,168,169,170,178,179,180,181,182,183,184,185,186,194,195,196,197,198,199,200,201,202,210,211,212,213,214,215,216,217,218,225,226,227,228,229,230,231,232,233,234,241,242,243,244,245,246,247,248,249,250,255,196,0,31,1,0,3,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,1,2,3,4,5,6,7,8,9,10,11,255,196,0,181,17,0,2,1,2,4,4,3,4,7,5,4,4,0,1,2,119,0,1,2,3,17,4,5,33,49,6,18,65,81,7,97,113,19,34,50,129,8,20,66,145,161,177,193,9,35,51,82,240,21,98,114,209,10,22,36,52,225,37,241,23,24,25,26,38,39,40,41,42,53,54,55,56,57,58,67,68,69,70,71,72,73,74,83,84,85,86,87,88,89,90,99,100,101,102,103,104,105,106,115,116,117,118,119,120,121,122,130,131,132,133,134,135,136,137,138,146,147,148,149,150,151,152,153,154,162,163,164,165,166,167,168,169,170,178,179,180,181,182,183,184,185,186,194,195,196,197,198,199,200,201,202,210,211,212,213,214,215,216,217,218,226,227,228,229,230,231,232,233,234,242,243,244,245,246,247,248,249,250,255,218,0,12,3,1,0,2,17,3,17,0,63,0,224,104,162,138,251,35,140,255,217];
 
@@ -29,8 +31,9 @@ class FakeCamera extends ImagePickerPlatform with MockPlatformInterfaceMixin {
   int taken = 0;
   @override
   Future<XFile?> getImageFromSource({required ImageSource source, ImagePickerOptions options = const ImagePickerOptions()}) async {
-    // a real (tiny) JPEG; a comment segment with random bytes makes every photo distinct
-    final bytes = <int>[..._jpeg.sublist(0, 2), 0xFF, 0xFE, 0, 34, ...List.generate(32, (_) => _rnd.nextInt(256)), ..._jpeg.sublist(2)];
+    // a real JPEG (a phone-sized picture when PHOTO is given); a comment segment with random bytes makes every photo distinct
+    final base = photoPath.isEmpty ? _jpeg : File(photoPath).readAsBytesSync();
+    final bytes = <int>[...base.sublist(0, 2), 0xFF, 0xFE, 0, 34, ...List.generate(32, (_) => _rnd.nextInt(256)), ...base.sublist(2)];
     final f = File('${Directory.systemTemp.path}/fr_photo_${DateTime.now().microsecondsSinceEpoch}.jpg');
     f.writeAsBytesSync(bytes);
     taken++;
@@ -79,6 +82,14 @@ void main() {
       await idle(800);
     }
 
+    // the real Arabic font (tests use a placeholder font otherwise), so the text burnt into the photos is the real text
+    await tester.runAsync(() async {
+      final f = FontLoader('Tajawal');
+      for (final w in ['Regular', 'Bold', 'ExtraBold']) {
+        f.addFont(rootBundle.load('assets/fonts/Tajawal-$w.ttf'));
+      }
+      await f.load();
+    });
     await tester.pumpWidget(const FuelUpApp(signedIn: false));
     await type('اسم المستخدم', user);
     await type('كلمة المرور', pass);
@@ -140,8 +151,8 @@ void main() {
     gps = false;
     await tapText('صوّر: العداد السري بعد التفريغ');
     await settle(find.text('افتح الكاميرا')); await tapText('افتح الكاميرا');
-    await settle(find.text('استخدم الصورة')); await tapText('استخدم الصورة');
     await settle(find.text('لا توجد إشارة GPS في المكان')); await tapText('لا توجد إشارة GPS في المكان');
+    await settle(find.text('استخدم الصورة')); await tapText('استخدم الصورة');
     await idle(1500);
     await type('قراءة العداد بعد التفريغ', '112000');
     await tester.ensureVisible(find.text('حالة الصهريج بعد التفريغ'));
