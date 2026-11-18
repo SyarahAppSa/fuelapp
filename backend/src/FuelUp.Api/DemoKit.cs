@@ -18,6 +18,20 @@ public static class DemoKit
     public static string OpsUser(IConfiguration cfg) => (cfg["Demo:OpsUsername"] ?? "fuelup_ops_demo").Trim().ToLowerInvariant();
     private const string Plate = "ت ج ر 2026", MeterSerial = "DEMO-SM-2026";
 
+    private static async Task<Customer> DemoCustomerAsync(FuelUpDb db) =>
+        await db.Customers.FirstOrDefaultAsync(c => c.Name == "عميل تجريبي — شركة الاختبار")
+        ?? db.Customers.Add(new Customer { Name = "عميل تجريبي — شركة الاختبار", Project = "مولدات الموقع", Site = "الدمام — المدينة الصناعية الثانية، بوابة 3", Recipient = "مشرف الموقع", Lat = 26.37, Lng = 50.15 }).Entity;
+
+    /// <summary>A «نقل وتوريد» order for the demo trip (created through OrderService, so it is numbered and audited like a real one).</summary>
+    private static async Task<CustomerOrder> DemoOrderAsync(FuelUpDb db, Actor boss, Customer customer, decimal qty = 20000)
+    {
+        var audit = new AuditWriter(db);
+        var orders = new OrderService(db, new TripService(db, new MeterLedger(db), new AssignmentService(db, audit), audit), audit, new DocumentService(db));
+        var n = await db.Orders.CountAsync(o => o.CustomerId == customer.Id) + 1;
+        return await orders.CreateAsync(boss, new CreateOrderInput(customer.Id, OrderType.TransportAndSupply, "ديزل", qty, OrderPriority.Urgent, DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow.AddDays(1), $"PO-DEMO-{n:000}", "طلب تجريبي لتطبيق السائق", 0.12m, 1.70m));
+    }
+
     public static async Task RunAsync(FuelUpDb db, TenantContext tenant, IConfiguration cfg, ILogger log)
     {
         var driverPass = cfg["Demo:DriverPassword"];
@@ -88,20 +102,31 @@ public static class DemoKit
             await db.SaveChangesAsync();
         }
 
-        // one trip always waiting for the demo driver (not started, no report yet)
-        var waiting = await db.Trips.Where(t => t.DriverId == driver.Id && t.Status == TripStatus.WaitingLoad).Select(t => t.Id).ToListAsync();
-        var ready = waiting.Count > 0 && waiting.Any(id => !db.FillReports.Any(r => r.TripId == id));
-        if (!ready)
+        // one trip always waiting for the demo driver (not started, no report yet), part of a customer order so the app shows its order no.
+        var waiting = await db.Trips.Where(t => t.DriverId == driver.Id && t.Status == TripStatus.WaitingLoad).OrderByDescending(t => t.CreatedAt).ToListAsync();
+        var ready = waiting.FirstOrDefault(t => !db.FillReports.Any(r => r.TripId == t.Id));
+        if (ready is null)
         {
-            var customer = await db.Customers.FirstOrDefaultAsync(c => c.Name == "عميل تجريبي — شركة الاختبار")
-                           ?? db.Customers.Add(new Customer { Name = "عميل تجريبي — شركة الاختبار", Project = "مولدات الموقع", Site = "الدمام — المدينة الصناعية الثانية، بوابة 3", Recipient = "مشرف الموقع", Lat = 26.37, Lng = 50.15 }).Entity;
+            var customer = await DemoCustomerAsync(db);
             var station = await db.Stations.FirstOrDefaultAsync(s => s.Type == StationType.Aramco)
                           ?? db.Stations.Add(new Station { Name = "أرامكو رأس تنورة (تجريبي)", Type = StationType.Aramco, City = "رأس تنورة", Lat = 26.64, Lng = 50.16 }).Entity;
             await db.SaveChangesAsync();
+            var order = await DemoOrderAsync(db, boss, customer);
             var n = await db.Trips.CountAsync(t => t.DriverId == driver.Id) + 1;
-            var t = await trips.CreateAsync(boss, new CreateTrip(customer.Id, driver.Id, vehicle.Id, station.Id, $"DEMO-{n:000}", "ديزل", 20000, null, 0.85m));
+            ready = await trips.CreateAsync(boss, new CreateTrip(customer.Id, driver.Id, vehicle.Id, station.Id, $"DEMO-{n:000}", "ديزل", 20000, null, order.TransportRatePerLiter), order.Id);
+            audit.Write(boss, "order", order.Id, "إسناد رحلة", $"{ready.No} · {vehicle.Plate} · {driver.Name} · 20,000 لتر");
             await db.SaveChangesAsync();
-            log.LogWarning("Demo kit: trip {Trip} assigned to {User}, ready to start", t.No, DriverUser);
+            log.LogWarning("Demo kit: trip {Trip} of order {Order} assigned to {User}, ready to start", ready.No, order.No, DriverUser);
+        }
+        else if (ready.OrderId is null)   // databases from before customer orders: put the waiting trip under an order (once)
+        {
+            var customer = await db.Customers.FirstAsync(c => c.Id == ready.CustomerId);
+            var order = await DemoOrderAsync(db, boss, customer, ready.QtyRequested);
+            ready.OrderId = order.Id;
+            audit.Write(boss, "order", order.Id, "ربط رحلة سابقة بالطلب", ready.No);
+            await trips.SyncOrderAsync(boss, ready);
+            await db.SaveChangesAsync();
+            log.LogWarning("Demo kit: waiting trip {Trip} linked to order {Order}", ready.No, order.No);
         }
         tenant.Clear();
     }

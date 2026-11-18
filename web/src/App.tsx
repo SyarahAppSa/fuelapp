@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import qrcode from 'qrcode-generator'
-import { api, can, enrollMfa, login, logout, verifyMfa, type LoginStep, type Me } from './api'
+import { api, can, enrollMfa, ksa, login, logout, post, verifyMfa, type LoginStep, type Me } from './api'
 import Dashboard from './pages/Dashboard'
 import Trips from './pages/Trips'
 import FillReport from './pages/FillReport'
@@ -18,6 +18,10 @@ import PartView from './pages/PartView'
 import TruckFile from './pages/TruckFile'
 import PartLabels from './pages/PartLabels'
 import MyCustody from './pages/MyCustody'
+import Orders from './pages/Orders'
+import OrderHub from './pages/OrderHub'
+import Dispatch from './pages/Dispatch'
+import Documents, { DocumentView } from './pages/Documents'
 
 export function useMe() {
   return useQuery({ queryKey: ['me'], queryFn: () => api<Me>('/api/me'), staleTime: 60_000, retry: false })
@@ -101,6 +105,35 @@ function Login() {
   )
 }
 
+interface Note { id: string; text: string; ref?: string; at: string; readAt?: string }
+
+/** Notifications of the signed-in user (document expiry alerts, fill reports to review…). A ref starting with "/" opens that record. */
+function Bell() {
+  const [open, setOpen] = useState(false)
+  const nav = useNavigate()
+  const qc = useQueryClient()
+  const { data } = useQuery({ queryKey: ['notifications'], queryFn: () => api<Note[]>('/api/notifications'), refetchInterval: 120_000 })
+  const unread = data?.filter(n => !n.readAt).length ?? 0
+  async function markRead() { await post('/api/notifications/read-all'); qc.invalidateQueries({ queryKey: ['notifications'] }) }
+  return (
+    <div className="bell-wrap">
+      <button className="btn bell" aria-label={`الإشعارات (${unread} غير مقروء)`} aria-expanded={open} onClick={() => setOpen(!open)}>🔔{unread > 0 && <span className="badge num">{unread}</span>}</button>
+      {open && (
+        <div className="bell-list" role="dialog" aria-label="الإشعارات">
+          <div className="spread" style={{ padding: '8px 12px', borderBottom: '1px solid var(--line)' }}><b>الإشعارات</b>{unread > 0 && <button className="btn" style={{ padding: '2px 10px' }} onClick={markRead}>تعليم الكل كمقروء</button>}</div>
+          {(data ?? []).length === 0 && <div className="sub" style={{ padding: 12 }}>لا توجد إشعارات.</div>}
+          {data?.slice(0, 30).map(n => {
+            const link = n.ref?.startsWith('/') ? n.ref : null
+            return (
+              <button key={n.id} className={`bell-item ${n.readAt ? '' : 'unread'}`} disabled={!link} onClick={() => { if (link) { setOpen(false); nav(link) } }}>
+                <span>{n.text}</span><span className="sub num">{ksa(n.at)}</span>
+              </button>)
+          })}
+        </div>)}
+    </div>
+  )
+}
+
 function Layout() {
   const { data: me, isError, isLoading } = useMe()
   const nav = useNavigate()
@@ -109,12 +142,15 @@ function Layout() {
   if (isLoading) return <div className="sub" style={{ padding: 24 }}>جارٍ التحميل…</div>
   const links = [
     { to: '/', label: 'لوحة التحكم', show: can(me, 'Ops') },
+    { to: '/orders', label: 'طلبات العملاء', show: can(me, 'Ops') },
+    { to: '/dispatch', label: 'لوحة التوزيع', show: can(me, 'Ops') },
     { to: '/trips', label: 'الرحلات', show: can(me, 'Ops') },
     { to: '/fill-reports', label: 'تقارير التعبئة', show: can(me, 'FillReports') },
     { to: '/fill-report', label: 'تقرير الكميات والعمليات', show: can(me, 'Moves') },
     { to: '/attendance', label: 'الحضور والانصراف', show: true },
     { to: '/custody', label: 'العُهد وقطع الغيار', show: can(me, 'Custody') },
     { to: '/my-custody', label: 'عهدتي', show: !!me?.driverId },
+    { to: '/documents', label: 'وثائق المركبات والسائقين', show: can(me, 'Documents') || can(me, 'Ops') || can(me, 'Master') },
     { to: '/assign', label: 'الإسناد', show: can(me, 'Assign') },
     { to: '/meters', label: 'العدادات', show: can(me, 'Meters') },
     { to: '/master', label: 'البيانات الأساسية', show: can(me, 'Master') },
@@ -125,11 +161,12 @@ function Layout() {
     <div className="app">
       <aside className="side" aria-label="القائمة الرئيسية">
         <div className="side-brand"><img src="/logo_mark.png" alt="" /><div><b>فيول آب</b><small>FULL APP</small></div></div>
-        <nav>{links.filter(l => l.show).map(l => <NavLink key={l.to} to={l.to} end={l.to !== '/custody'}>{l.label}</NavLink>)}</nav>
+        <nav>{links.filter(l => l.show).map(l => <NavLink key={l.to} to={l.to} end={!['/custody', '/orders', '/documents', '/fill-reports'].includes(l.to)}>{l.label}</NavLink>)}</nav>
       </aside>
       <div className="shell">
         <header className="topbar">
           <div className="end">
+            <Bell />
             <span className="chip-user">{me?.displayName ?? '…'}</span>
             <button className="btn" onClick={async () => { await logout(); qc.clear(); nav('/login') }}>خروج</button>
           </div>
@@ -141,6 +178,12 @@ function Layout() {
           <Route path="/security" element={<Security />} />
           <Route path="/attendance" element={<Attendance />} />
           <Route path="/fill-reports" element={<FillReports />} />
+          <Route path="/fill-reports/:id" element={<FillReports />} />
+          <Route path="/orders" element={<Orders />} />
+          <Route path="/orders/:id" element={<OrderHub />} />
+          <Route path="/dispatch" element={<Dispatch />} />
+          <Route path="/documents" element={<Documents />} />
+          <Route path="/documents/:id" element={<DocumentView />} />
           <Route path="/assign" element={<Assignments />} />
           <Route path="/meters" element={<Meters />} />
           <Route path="/master" element={<MasterData />} />

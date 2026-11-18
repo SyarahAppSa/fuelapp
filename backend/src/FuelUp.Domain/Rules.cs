@@ -134,6 +134,7 @@ public static class Permissions
             [Section.Assign] = PermissionLevel.Edit, [Section.Meters] = PermissionLevel.Edit, [Section.Tracking] = PermissionLevel.Edit,
             [Section.VehicleFile] = PermissionLevel.Edit, [Section.Custody] = PermissionLevel.View, [Section.Master] = PermissionLevel.View,
             [Section.Costs] = PermissionLevel.View, [Section.Export] = PermissionLevel.Edit, [Section.Attendance] = PermissionLevel.View, [Section.FillReports] = PermissionLevel.Edit,
+            [Section.Documents] = PermissionLevel.Edit,
         },
         [Role.Storekeeper] = new Dictionary<Section, PermissionLevel> { [Section.Custody] = PermissionLevel.Edit, [Section.VehicleFile] = PermissionLevel.View, [Section.Export] = PermissionLevel.Edit },
         [Role.Driver] = new Dictionary<Section, PermissionLevel> { [Section.Driver] = PermissionLevel.Edit, [Section.VehicleFile] = PermissionLevel.Edit },

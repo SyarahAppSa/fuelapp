@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, blobUrl, can, fmt, ksa, post, signed } from '../api'
 import { useMe } from '../App'
 import { Field, Panel, useAction } from '../ui'
@@ -8,7 +9,7 @@ type Status = 'Draft' | 'Submitted' | 'NeedsReview' | 'Returned' | 'Approved'
 interface Row { id: string; no: string; tripNo: string; plate: string; driverName: string; customerName: string; deliverySite: string; status: Status; startedAt: string; submittedAt?: string; qtyRequested: number; loadedQty?: number; deliveredQty?: number; difference?: number; flagged: boolean; stagesDone: number }
 interface Photo { kind: string; stage: string; label: string; id?: string; capturedAt?: string; uploadedAt: string; lat?: number; lng?: number; locationNote?: string; fromGallery: boolean; retakes: number }
 interface Detail {
-  id: string; no: string; tripNo: string; status: Status; startedAt: string; submittedAt?: string; plate: string; trailerPlate?: string; customerName: string; deliverySite: string; loadingSite: string; product: string
+  id: string; no: string; tripNo: string; orderId?: string; orderNo?: string; customerRef?: string; status: Status; startedAt: string; submittedAt?: string; plate: string; trailerPlate?: string; customerName: string; deliverySite: string; loadingSite: string; product: string
   driver: { name: string; nationalId?: string; phone?: string; masked: boolean }
   stages: { preFill: { done: boolean; at?: string }; postFill: { done: boolean; at?: string; loadedQty?: number; loadedFromTrip: boolean }; arrival: { done: boolean; at?: string; meterBefore?: number; secretMeterSerial?: string }; postUnload: { done: boolean; at?: string; meterAfter?: number; outcome: 'Full' | 'Partial' | 'Failed'; outcomeReason?: string; tankState?: string } }
   quantities: { requested: number; loaded?: number; delivered?: number; difference?: number; allowed: number }
@@ -45,7 +46,9 @@ function Thumb({ p, onOpen }: { p: Photo; onOpen: (url: string, label: string) =
 export default function FillReports() {
   const { data: me } = useMe()
   const [filters, setFilters] = useState<{ q: string; status: string; from: string; to: string }>({ q: '', status: '', from: '', to: '' })
-  const [openId, setOpenId] = useState<string | null>(null)
+  const { id: openId } = useParams()
+  const nav = useNavigate()
+  const setOpenId = (id: string | null) => nav(id ? `/fill-reports/${id}` : '/fill-reports')
   const qs = new URLSearchParams(Object.entries(filters).filter(([, v]) => v)).toString()
   const list = useQuery({ queryKey: ['fill-reports', qs], queryFn: () => api<{ total: number; items: Row[] }>(`/api/fill-reports?${qs}`) })
 
@@ -117,7 +120,8 @@ function ReportView({ id, canEdit, onBack }: { id: string; canEdit: boolean; onB
 
       <section className="hero" style={{ marginTop: 14 }}>
         <div><div>{r.customerName}</div><div className="big" style={{ fontSize: 26 }}>{r.plate}{r.trailerPlate && <small> · مقطورة {r.trailerPlate}</small>}</div>
-          <div>{r.loadingSite} ← {r.deliverySite}</div><div className="num">الرحلة {r.tripNo} · {r.product}</div></div>
+          <div>{r.loadingSite} ← {r.deliverySite}</div><div className="num">الرحلة {r.tripNo} · {r.product}</div>
+          {r.orderNo && r.orderId && <div>طلب العميل <Link to={`/orders/${r.orderId}`} className="num" style={{ color: '#fff', fontWeight: 800 }}>{r.orderNo}</Link>{r.customerRef && <span className="num"> · أمر الشراء {r.customerRef}</span>}</div>}</div>
         <div className="tiles">
           <div className="tile"><div>السائق</div><div className="v" style={{ fontSize: 17 }}>{r.driver.name}</div>
             <div className="num">الهوية {r.driver.nationalId ?? '—'} · الجوال {r.driver.phone ?? '—'}</div>{r.driver.masked && <div style={{ fontSize: 11 }}>مخفية جزئيًا حسب صلاحيتك</div>}</div>

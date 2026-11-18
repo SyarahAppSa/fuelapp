@@ -10,13 +10,13 @@ export type TripStatus = 'WaitingLoad' | 'Loaded' | 'EnRoute' | 'Arrived' | 'Unl
 export interface Snapshot { driverName: string; plate: string; customerName: string; project?: string; site: string; stationName: string; meterSerial?: string }
 export interface Delivery { id: string; seq: number; site: string; arrivalLocation?: string; meterBefore?: number; meterAfter?: number; received?: number; receiptNo?: string; submittedAt?: string; sealsBroken: boolean }
 export interface Trip {
-  id: string; no: string; status: TripStatus; createdAt: string; driverId: string; vehicleId?: string; product: string; qtyRequested: number; sourceRef: string
+  id: string; no: string; status: TripStatus; createdAt: string; driverId: string; vehicleId?: string; orderId?: string; product: string; qtyRequested: number; sourceRef: string
   reviewReason?: string; resolution?: string; approvedAt?: string; snapshot?: Snapshot
   loading?: { qty: number; docNo: string; at: string; meterStart?: number; meterEnd?: number; odometer?: number }
   deliveries: Delivery[]; handovers: { toDriverId: string; ack: string; note: string }[]
 }
 export interface Reconciliation { loaded?: number; loadMeterQty?: number; delivered?: number; receipt?: number; unsettled?: number; meterVsReceipt?: number; tolerance: number }
-export interface TripView { trip: Trip; reconciliation: Reconciliation; statusLabel: string }
+export interface TripView { trip: Trip; reconciliation: Reconciliation; statusLabel: string; orderNo?: string; customerRef?: string }
 export interface Paged<T> { items: T[]; total: number; page: number; size: number }
 export interface Me { id: string; username: string; displayName: string; role: string; driverId?: string; permissions: Record<string, 'None' | 'View' | 'Edit'> }
 

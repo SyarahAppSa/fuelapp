@@ -154,7 +154,7 @@ class _TripList extends StatelessWidget {
           child: ListTile(
             onTap: () => onTap(t),
             title: Text('${t.no} · ${t.customer}', style: const TextStyle(fontWeight: FontWeight.w700)),
-            subtitle: Text('${t.station} ← ${t.site}\nالكمية المطلوبة ${fmt(t.qtyRequested)} لتر'),
+            subtitle: Text('${t.orderNo != null ? '${t.orderLine}\n' : ''}${t.station} ← ${t.site}\nالكمية المطلوبة ${fmt(t.qtyRequested)} لتر'),
             isThreeLine: true,
             trailing: Chip(label: Text(t.label, style: const TextStyle(color: Colors.white, fontSize: 12)), backgroundColor: statusColor(t.status), side: BorderSide.none),
           ),

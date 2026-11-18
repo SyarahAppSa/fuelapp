@@ -247,6 +247,10 @@ class TripView {
   String get label => json['statusLabel'] as String;
   bool get isOpen => openStatuses.contains(status);
   String get customer => snap['customerName'] as String? ?? '';
+  /// Customer order (طلب العميل) the trip belongs to, and the customer's PO no.; null for trips without an order.
+  String? get orderNo => json['orderNo'] as String?;
+  String? get customerRef => json['customerRef'] as String?;
+  String get orderLine => orderNo == null ? '' : 'طلب العميل $orderNo${customerRef != null ? ' · أمر الشراء $customerRef' : ''}';
   String get site => snap['site'] as String? ?? '';
   String get station => snap['stationName'] as String? ?? '';
   String? get vehicleId => trip['vehicleId'] as String?;

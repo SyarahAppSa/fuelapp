@@ -25,3 +25,5 @@ loadtest-result.json
 mobile/test/live/*.jpg
 backend/src/FuelUp.Api/wwwroot/
 tests/.fill-app-flow.json
+backend/src/FuelUp.Api/keys-*/
+backend/src/FuelUp.Api/files-*/

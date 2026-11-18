@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { can, fmt, post } from '../api'
 import { useMe } from '../App'
+import { DocsPanel } from './Documents'
 import { Field, Panel, driverTypes, formData, stationTypes, useAction, useCustomers, useDrivers, useMeters, useStations, useVehicles } from '../ui'
 
 type Tab = 'stations' | 'vehicles' | 'drivers' | 'customers' | 'meters'
@@ -9,6 +10,7 @@ const tabs: [Tab, string][] = [['stations', 'مواقع التعبئة'], ['vehi
 export default function MasterData() {
   const { data: me } = useMe()
   const [tab, setTab] = useState<Tab>('stations')
+  const [docsOf, setDocsOf] = useState<string | null>(null)
   const edit = can(me, 'Master', 'Edit')
   const act = useAction()
   const stations = useStations(), vehicles = useVehicles(), drivers = useDrivers(), customers = useCustomers(), meters = useMeters()
@@ -60,8 +62,10 @@ export default function MasterData() {
           <Field label="رقم الهوية / الإقامة"><input name="nationalId" inputMode="numeric" pattern="[12][0-9]{9}" maxLength={10} /></Field>
           <Field label="النوع *"><select name="type" required>{Object.entries(driverTypes).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
         </div><div className="actions"><button className="btn pri" disabled={act.busy}>إضافة سائق</button></div></form>}
-        <Panel title="السائقون"><div className="tblw"><table><thead><tr><th>الاسم</th><th>الرقم الوظيفي</th><th>الجوال</th><th>النوع</th></tr></thead>
-          <tbody>{drivers.data?.map(d => <tr key={d.id}><td>{d.name}</td><td className="num">{d.empNo ?? '—'}</td><td className="num">{d.phone ?? '—'}</td><td>{driverTypes[d.type]}</td></tr>)}</tbody></table></div></Panel>
+        <Panel title="السائقون"><div className="tblw"><table><thead><tr><th>الاسم</th><th>الرقم الوظيفي</th><th>الجوال</th><th>النوع</th><th>الوثائق</th></tr></thead>
+          <tbody>{drivers.data?.map(d => <tr key={d.id} className={docsOf === d.id ? 'picked' : ''}><td>{d.name}</td><td className="num">{d.empNo ?? '—'}</td><td className="num">{d.phone ?? '—'}</td><td>{driverTypes[d.type]}</td>
+            <td><button className="btn" onClick={() => setDocsOf(docsOf === d.id ? null : d.id)}>{docsOf === d.id ? 'إخفاء' : 'الوثائق'}</button></td></tr>)}</tbody></table></div></Panel>
+        {docsOf && <><h2 style={{ marginTop: 14 }}>وثائق السائق: {drivers.data?.find(d => d.id === docsOf)?.name}</h2><DocsPanel ownerKind="driver" ownerId={docsOf} /></>}
       </>}
 
       {tab === 'customers' && <>

@@ -140,3 +140,15 @@ input, select, textarea { border: 1px solid var(--line); background: var(--surfa
   .tblw { overflow: visible }
   .labels { grid-template-columns: repeat(3, 1fr); gap: 4mm }
 }
+
+/* customer orders, dispatch board, notifications */
+.st-Closed { background: var(--brand-soft); color: var(--brand) }
+.dispatch { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 16px; align-items: start }
+.dispatch .panel { margin-top: 14px }
+tr.picked td { background: var(--brand-soft) !important }
+@media (max-width: 1100px) { .dispatch { grid-template-columns: 1fr } }
+.bell-wrap { position: relative }
+.bell { position: relative; padding: 6px 12px } .bell .badge { position: absolute; top: -6px; inset-inline-start: -6px; background: var(--brand-red); color: #fff; border-radius: 99px; font-size: 11px; padding: 0 6px; min-width: 18px }
+.bell-list { position: absolute; top: calc(100% + 6px); inset-inline-end: 0; width: min(420px, 92vw); max-height: 70vh; overflow-y: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); z-index: 30 }
+.bell-item { display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: start; padding: 10px 12px; border: 0; border-bottom: 1px solid var(--line); background: none; cursor: pointer }
+.bell-item:disabled { cursor: default } .bell-item:not(:disabled):hover { background: var(--surface-2) } .bell-item.unread { background: var(--info-soft) }

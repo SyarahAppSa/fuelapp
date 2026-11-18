@@ -55,6 +55,12 @@ public class FuelUpDb(DbContextOptions<FuelUpDb> options, TenantContext? tenant 
     public DbSet<TripCounter> TripCounters => Set<TripCounter>();
     public DbSet<AttendanceRecord> Attendance => Set<AttendanceRecord>();
     public DbSet<FillReport> FillReports => Set<FillReport>();
+    public DbSet<CustomerOrder> Orders => Set<CustomerOrder>();
+    public DbSet<OrderCounter> OrderCounters => Set<OrderCounter>();
+    public DbSet<DocumentType> DocumentTypes => Set<DocumentType>();
+    public DbSet<FleetDocument> Documents => Set<FleetDocument>();
+    public DbSet<FleetDocumentVersion> DocumentVersions => Set<FleetDocumentVersion>();
+    public DbSet<DocumentAlert> DocumentAlerts => Set<DocumentAlert>();
 
     public bool IsPostgres => Database.ProviderName == "Npgsql.EntityFrameworkCore.PostgreSQL";
 
@@ -85,6 +91,7 @@ public class FuelUpDb(DbContextOptions<FuelUpDb> options, TenantContext? tenant 
             e.HasIndex(x => new { x.CompanyId, x.No }).IsUnique();
             e.HasIndex(x => new { x.CompanyId, x.Status, x.CreatedAt });
             e.HasIndex(x => x.DriverId);
+            e.HasIndex(x => x.OrderId);
             e.Property(x => x.Status).HasConversion<string>();
             Json(e.Property(x => x.Snapshot));
             e.HasOne(x => x.Loading).WithOne().HasForeignKey<TripLoading>(l => l.TripId);
@@ -148,6 +155,27 @@ public class FuelUpDb(DbContextOptions<FuelUpDb> options, TenantContext? tenant 
             e.Property(x => x.Outcome).HasConversion<string>();
             e.Ignore(x => x.DeliveredQty);
         });
+        b.Entity<CustomerOrder>(e =>
+        {
+            e.ToTable("customer_orders");
+            e.HasIndex(x => new { x.CompanyId, x.No }).IsUnique();
+            e.HasIndex(x => new { x.CompanyId, x.Status, x.CreatedAt });
+            e.HasIndex(x => x.CustomerId);
+            e.Property(x => x.Type).HasConversion<string>();
+            e.Property(x => x.Priority).HasConversion<string>();
+            e.Property(x => x.Status).HasConversion<string>();
+        });
+        b.Entity<OrderCounter>(e => { e.ToTable("order_counters"); e.HasKey(x => new { x.CompanyId, x.Period }); e.Property(x => x.Period).HasMaxLength(4); });
+        b.Entity<DocumentType>(e => { e.ToTable("document_types"); e.HasIndex(x => new { x.CompanyId, x.Name }).IsUnique(); Json(e.Property(x => x.Fields)); });
+        b.Entity<FleetDocument>(e =>
+        {
+            e.ToTable("fleet_documents");
+            e.HasIndex(x => new { x.CompanyId, x.TypeId, x.OwnerId }).IsUnique();   // one document of a type per vehicle / driver: renewals are versions
+            e.HasIndex(x => x.OwnerId);
+            e.HasIndex(x => new { x.CompanyId, x.Expiry });
+        });
+        b.Entity<FleetDocumentVersion>(e => { e.ToTable("fleet_document_versions"); e.HasIndex(x => new { x.DocumentId, x.Version }).IsUnique(); });
+        b.Entity<DocumentAlert>(e => { e.ToTable("document_alerts"); e.HasIndex(x => new { x.DocumentId, x.Expiry, x.OffsetDays }).IsUnique(); });
         b.Entity<TripCounter>(e => { e.ToTable("trip_counters"); e.HasKey(x => new { x.CompanyId, x.Period }); e.Property(x => x.Period).HasMaxLength(4); });
 
         foreach (var p in b.Model.GetEntityTypes().SelectMany(t => t.GetProperties()).Where(p => p.ClrType == typeof(decimal) || p.ClrType == typeof(decimal?)))

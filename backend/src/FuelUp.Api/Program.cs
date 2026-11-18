@@ -52,6 +52,11 @@ builder.Services.AddScoped<MeterLedger>();
 builder.Services.AddScoped<AssignmentService>();
 builder.Services.AddScoped<TripService>();
 builder.Services.AddScoped<CustodyService>();
+builder.Services.AddScoped<DocumentService>();
+builder.Services.AddScoped<OrderService>();
+builder.Services.AddSingleton(new OwnerDb(new DbContextOptionsBuilder<FuelUpDb>().UseNpgsql(Cs("Migrations") ?? runtimeCs).UseSnakeCaseNamingConvention().AddInterceptors(interceptor).Options));
+builder.Services.AddSingleton<DocumentAlertWorker>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<DocumentAlertWorker>());
 builder.Services.AddScoped<ActorAccessor>();
 builder.Services.AddScoped<SessionService>();
 builder.Services.AddSingleton<TokenService>();
@@ -144,6 +149,7 @@ else if (MfaService.Exempt.Count > 0) app.Logger.LogWarning("Trial environment: 
     if (cfg.GetValue<bool>("Seed:Demo")) await DemoSeeder.RunAsync(owner, tenant);
     await Bootstrap.RunAsync(owner, tenant, cfg, app.Logger);
     await PresetSync.RunAsync(owner, tenant, app.Logger);
+    await DocumentService.SeedAsync(owner, tenant);
     await DemoKit.RunAsync(owner, tenant, cfg, app.Logger);
     if (Cs("Migrations") is null)
         app.Logger.LogWarning("ConnectionStrings:Migrations is not set: the API runs with the owner role. Use a separate restricted role in production.");

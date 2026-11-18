@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, can, fmt, ksa, post, signed, type Paged, type Trip, type TripStatus, type TripView } from '../api'
 import { useMe } from '../App'
@@ -9,7 +10,9 @@ const FILTERS: [TripStatus | '', string][] = [['', 'الكل'], ['EnRoute', 'ف�
 export default function Trips() {
   const [status, setStatus] = useState<TripStatus | ''>('')
   const [page, setPage] = useState(1)
-  const [open, setOpen] = useState<string | null>(null)
+  const [params, setParams] = useSearchParams()
+  const open = params.get('open')
+  const setOpen = (id: string | null) => setParams(id ? { open: id } : {})
   const { data, isLoading } = useQuery({ queryKey: ['trips', status, page], queryFn: () => api<Paged<TripView>>(`/api/trips?page=${page}&size=20${status ? '&status=' + status : ''}`) })
   const pages = data ? Math.max(1, Math.ceil(data.total / data.size)) : 1
   const { data: me } = useMe()
@@ -23,12 +26,13 @@ export default function Trips() {
       <section className="panel" style={{ marginTop: 14 }}>
         {isLoading ? <div className="sub" style={{ padding: 16 }}>جارٍ التحميل…</div> : (
           <div className="tblw"><table>
-            <thead><tr><th>رقم الرحلة</th><th>الحالة</th><th>العميل</th><th>السائق / المركبة</th><th>المحمّلة</th><th>المسلّمة (عداد)</th><th>حسب السند</th><th>الفرق</th></tr></thead>
-            <tbody>{data?.items.map(({ trip: t, reconciliation: c, statusLabel }) => {
+            <thead><tr><th>رقم الرحلة</th><th>طلب العميل</th><th>الحالة</th><th>العميل</th><th>السائق / المركبة</th><th>المحمّلة</th><th>المسلّمة (عداد)</th><th>حسب السند</th><th>الفرق</th></tr></thead>
+            <tbody>{data?.items.map(({ trip: t, reconciliation: c, statusLabel, orderNo }) => {
               const bad = c.unsettled != null && Math.abs(c.unsettled) > c.tolerance
               return (
                 <tr key={t.id} className="click" onClick={() => setOpen(t.id)}>
-                  <td className="num">{t.no}</td><td><span className={`chip st-${t.status}`}>{statusLabel}</span></td><td>{t.snapshot?.customerName}</td>
+                  <td className="num">{t.no}</td><td className="num">{orderNo && t.orderId ? <Link to={`/orders/${t.orderId}`} onClick={e => e.stopPropagation()}>{orderNo}</Link> : <span className="sub">—</span>}</td>
+                  <td><span className={`chip st-${t.status}`}>{statusLabel}</span></td><td>{t.snapshot?.customerName}</td>
                   <td>{t.snapshot?.driverName}<div className="sub num">{t.snapshot?.plate}</div></td>
                   <td className="num">{fmt(c.loaded)}</td><td className="num">{fmt(c.delivered)}</td><td className="num">{fmt(c.receipt)}</td><td className={`num ${bad ? 'diff' : ''}`}>{signed(c.unsettled)}</td>
                 </tr>)
@@ -77,12 +81,13 @@ function TripDrawer({ id, onClose }: { id: string; onClose: () => void }) {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['trips'] }); qc.invalidateQueries({ queryKey: ['trip', id] }) },
   })
   if (!data) return null
-  const { trip: t, reconciliation: c, statusLabel } = data.view
+  const { trip: t, reconciliation: c, statusLabel, orderNo, customerRef } = data.view
   const canApprove = can(me, 'Approve', 'Edit')
   return (
     <div className="drawer-scrim" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="drawer" role="dialog" aria-label={`الرحلة ${t.no}`}>
         <div className="spread"><div className="row"><h2 className="num">{t.no}</h2><span className={`chip st-${t.status}`}>{statusLabel}</span></div><button className="btn" onClick={onClose}>إغلاق</button></div>
+        {orderNo && t.orderId && <div className="card" style={{ padding: 12 }}>ضمن طلب العميل <Link className="num" to={`/orders/${t.orderId}`}><b>{orderNo}</b></Link>{customerRef && <span className="sub"> · أمر الشراء {customerRef}</span>} · {t.snapshot?.customerName}</div>}
         <div className="q3">
           <div className="q"><div className="sub">المحمّلة</div><div className="v">{fmt(c.loaded)}</div><div className="sub">سند {t.loading?.docNo ?? '—'}</div></div>
           <div className="q"><div className="sub">المسلّمة (عداد التفريغ)</div><div className="v">{fmt(c.delivered)}</div></div>
