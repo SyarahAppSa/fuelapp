@@ -198,3 +198,4 @@ tr.picked td { background: var(--brand-soft) !important }
 .ld-vthumb img { width: 100%; height: 100%; object-fit: cover }
 .src-Aramco { background: var(--info-soft); color: var(--info) } .src-Station { background: var(--ok-soft); color: var(--ok) } .src-MaysanYard { background: var(--brand-soft); color: var(--brand) }
 .lightbox-cap .btn { margin-inline-start: 8px }
+.ld-photos.ld-four { grid-template-columns: repeat(4, minmax(0, 1fr)) } @media (max-width: 1200px) { .ld-photos.ld-four { grid-template-columns: repeat(2, minmax(0, 1fr)) } } @media (max-width: 640px) { .ld-photos.ld-four { grid-template-columns: 1fr } }

@@ -10,9 +10,9 @@ using Microsoft.EntityFrameworkCore;
 namespace FuelUp.Api.Controllers;
 
 /// <summary>
-/// «توثيق التعبئة»: the loading part of every fill report — tank before / after filling and the loading document — linked to the
-/// customer order and the trip. A record appears as soon as the first loading photo reaches the server; the post-fill photo joins
-/// the same record. Viewing (and downloading photos) needs Fill Reports: View; «طلب إعادة التصوير» needs Fill Reports: Edit
+/// «توثيق التعبئة»: the four mandatory tank photos of every loading-and-delivery operation (at the start of filling, after filling,
+/// before unloading, after unloading) plus the loading document, linked to the customer order and the trip. A record appears as soon
+/// as its first photo reaches the server; the next ones join the same record; it is «مكتمل» when the four have arrived. Viewing (and downloading photos) needs Fill Reports: View; «طلب إعادة التصوير» needs Fill Reports: Edit
 /// (see FillReportsController.RequestRetake); Excel needs Export as in the other reports.
 /// </summary>
 [ApiController, Route("api/fill-reports")]
@@ -21,11 +21,13 @@ public class LoadingDocsController(FuelUpDb db, ActorAccessor actor) : Controlle
     private static readonly TimeSpan Ksa = TimeSpan.FromHours(3);
     private const int PageSize = 25;
 
+    public record StagePhoto(int Order, string Kind, string Stage, PhotoInfo? Photo);
     public record PhotoInfo(Guid Id, DateTimeOffset? CapturedAt, DateTimeOffset UploadedAt, double? Lat, double? Lng, string? LocationNote, bool FromGallery, int? LateMinutes, int Versions);
     public record Row(Guid Id, string No, Guid TripId, string TripNo, Guid? OrderId, string? OrderNo, string DriverName, string Plate, string? TrailerPlate,
         string Source, string SourceLabel, string Facility, string? City, string Product, decimal QtyRequested, decimal? LoadedQty,
         string? LoadingDocNo, string? LoadingDocNoFrom, string LoadingDocLabel, PhotoInfo? PreFill, PhotoInfo? PostFill, PhotoInfo? LoadingDoc,
-        DateTimeOffset FirstPhotoAt, string Status, string StatusLabel, List<string> Reasons, int OpenRetakes, FillReportStatus ReportStatus);
+        DateTimeOffset FirstPhotoAt, string Status, string StatusLabel, List<string> Reasons, int OpenRetakes, FillReportStatus ReportStatus,
+        List<StagePhoto> Stages, List<string> Missing);
 
     [HttpGet("loading")]
     public async Task<IActionResult> List([FromQuery, StringLength(60)] string? q, [FromQuery] DateOnly? from, [FromQuery] DateOnly? to,
@@ -35,10 +37,12 @@ public class LoadingDocsController(FuelUpDb db, ActorAccessor actor) : Controlle
         var all = await RowsAsync(QueryFor(q, from, to), source);
         var totals = new
         {
-            all = all.Count, awaitingPostFill = all.Count(r => r.Status == LoadingDocRules.AwaitingPostFill),
+            all = all.Count, incomplete = all.Count(r => r.Status == LoadingDocRules.Incomplete),
+            awaitingPostFill = all.Count(r => r.Status == LoadingDocRules.Incomplete),   // older name, kept for existing clients
             needsReview = all.Count(r => r.Status == LoadingDocRules.NeedsReview), complete = all.Count(r => r.Status == LoadingDocRules.Complete),
         };
-        var rows = string.IsNullOrWhiteSpace(status) ? all : all.Where(r => r.Status == status).ToList();
+        var wanted = LoadingDocRules.Normalize(status);
+        var rows = wanted == "" ? all : all.Where(r => r.Status == wanted).ToList();
         if (format == "xlsx") { a.Require(Section.Export, PermissionLevel.Edit); return Excel(rows); }
         page = Math.Max(page, 1);
         return Ok(new { totals, total = rows.Count, page, size = PageSize, items = rows.Skip((page - 1) * PageSize).Take(PageSize) });
@@ -145,12 +149,12 @@ public class LoadingDocsController(FuelUpDb db, ActorAccessor actor) : Controlle
                 return new PhotoInfo(p.Id, p.CapturedAt, p.UploadedAt, p.Lat, p.Lng, p.LocationNote, p.FromGallery, LoadingDocRules.LateMinutes(p.CapturedAt, p.UploadedAt), v.Count);
             }
             var (pre, post, doc) = (Latest(LoadingDocRules.PreFill), Latest(LoadingDocRules.PostFill), Latest(LoadingDocRules.LoadingDoc));
-            var facts = new[] { (LoadingDocRules.PreFill, pre), (LoadingDocRules.PostFill, post), (LoadingDocRules.LoadingDoc, doc) }
-                .Where(x => x.Item2 != null)
-                .Select(x => new LoadingDocRules.Photo(x.Item1, FillReportsController.SlotLabel(x.Item1), x.Item2!.CapturedAt, x.Item2.UploadedAt, x.Item2.Lat, x.Item2.LocationNote, x.Item2.FromGallery))
+            var stages = LoadingDocRules.Required.Select((x, i) => new StagePhoto(i + 1, x.Kind, x.Stage, Latest(x.Kind))).ToList();
+            var facts = LoadingDocRules.Kinds.Select(k => (k, p: Latest(k))).Where(x => x.p != null)
+                .Select(x => new LoadingDocRules.Photo(x.k, LoadingDocRules.StageLabel(x.k), x.p!.CapturedAt, x.p.UploadedAt, x.p.Lat, x.p.LocationNote, x.p.FromGallery))
                 .ToList();
             var loadedQty = r.LoadedQty ?? t?.Loading?.Qty;
-            var (status, reasons) = LoadingDocRules.Evaluate(facts, open[r.Id].OrderBy(x => x.RequestedAt).Select(x => new LoadingDocRules.OpenRetake(FillReportsController.SlotLabel(x.Kind), x.Note)).ToList(),
+            var (status, reasons, missing) = LoadingDocRules.Evaluate(facts, open[r.Id].OrderBy(x => x.RequestedAt).Select(x => new LoadingDocRules.OpenRetake(FillReportsController.SlotLabel(x.Kind), x.Note)).ToList(),
                 loadedQty, r.PostFillAt != null, now);
             if (status == LoadingDocRules.NotStarted && !includeNotStarted) continue;
 
@@ -162,7 +166,8 @@ public class LoadingDocsController(FuelUpDb db, ActorAccessor actor) : Controlle
             var first = mine.Where(p => LoadingDocRules.Kinds.Contains(p.Kind)).Select(p => p.CapturedAt ?? p.UploadedAt).DefaultIfEmpty(r.StartedAt).Min();
             rows.Add(new Row(r.Id, r.No, r.TripId, r.TripNo, t?.OrderId, t?.OrderId is { } oid ? orders.GetValueOrDefault(oid) : null, r.DriverName, r.Plate, r.TrailerPlate,
                 key, LoadingDocRules.SourceLabel(type), t?.Snapshot?.StationName ?? (string.IsNullOrEmpty(r.LoadingSite) ? station?.Name ?? "" : r.LoadingSite), station?.City,
-                r.Product, r.QtyRequested, loadedQty, docNo, docFrom, docLabel, pre, post, doc, first, status, LoadingDocRules.Label(status), reasons, open[r.Id].Count(), r.Status));
+                r.Product, r.QtyRequested, loadedQty, docNo, docFrom, docLabel, pre, post, doc, first, status, LoadingDocRules.Label(status, missing), reasons, open[r.Id].Count(), r.Status,
+                stages, missing));
         }
         return rows.OrderByDescending(x => x.FirstPhotoAt).ToList();   // newest first
     }
@@ -174,7 +179,8 @@ public class LoadingDocsController(FuelUpDb db, ActorAccessor actor) : Controlle
         ws.RightToLeft = true;
         string[] head = ["تاريخ ووقت أول صورة (السعودية)", "رقم الطلب", "رقم الرحلة", "رقم التقرير", "السائق", "اللوحة", "مصدر التحميل", "المنشأة / الفرع", "المنتج",
             "الكمية المطلوبة (لتر)", "الكمية المحمّلة (لتر)", "رقم سند التحميل / الفاتورة", "صورة قبل التعبئة: وقت الالتقاط", "صورة قبل التعبئة: الموقع",
-            "صورة بعد التعبئة: وقت الالتقاط", "صورة بعد التعبئة: الموقع", "صورة السند", "حالة التوثيق", "الأسباب"];
+            "صورة بعد التعبئة: وقت الالتقاط", "صورة بعد التعبئة: الموقع", "صورة قبل التفريغ: وقت الالتقاط", "صورة قبل التفريغ: الموقع",
+            "صورة بعد التفريغ: وقت الالتقاط", "صورة بعد التفريغ: الموقع", "صورة السند", "حالة التوثيق", "الصور المطلوبة", "الأسباب"];
         for (var i = 0; i < head.Length; i++) ws.Cell(1, i + 1).Value = head[i];
         static string When(DateTimeOffset? d) => d is { } x ? x.ToOffset(Ksa).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) : "";
         static string Where(PhotoInfo? p) => p is null ? "" : p.Lat is { } la ? $"{la.ToString("0.#####", CultureInfo.InvariantCulture)}, {p.Lng?.ToString("0.#####", CultureInfo.InvariantCulture)}" : p.LocationNote ?? "بدون موقع";
@@ -183,10 +189,13 @@ public class LoadingDocsController(FuelUpDb db, ActorAccessor actor) : Controlle
         {
             object?[] v = [When(x.FirstPhotoAt), x.OrderNo, x.TripNo, x.No, x.DriverName, x.Plate, x.SourceLabel, x.Facility + (x.City is null ? "" : " — " + x.City), x.Product,
                 x.QtyRequested, x.LoadedQty, x.LoadingDocNo, When(x.PreFill?.CapturedAt ?? x.PreFill?.UploadedAt), Where(x.PreFill),
-                When(x.PostFill?.CapturedAt ?? x.PostFill?.UploadedAt), Where(x.PostFill), x.LoadingDoc is null ? "لا" : "نعم", x.StatusLabel, string.Join("؛ ", x.Reasons)];
+                When(x.PostFill?.CapturedAt ?? x.PostFill?.UploadedAt), Where(x.PostFill),
+                When(x.Stages[2].Photo?.CapturedAt ?? x.Stages[2].Photo?.UploadedAt), Where(x.Stages[2].Photo),
+                When(x.Stages[3].Photo?.CapturedAt ?? x.Stages[3].Photo?.UploadedAt), Where(x.Stages[3].Photo),
+                x.LoadingDoc is null ? "لا" : "نعم", x.StatusLabel, string.Join("، ", x.Missing), string.Join("؛ ", x.Reasons)];
             for (var i = 0; i < v.Length; i++) ws.Cell(n, i + 1).Value = v[i] is decimal d ? d : XLCellValue.FromObject(v[i]?.ToString() ?? "");
             if (x.Status == LoadingDocRules.NeedsReview) ws.Row(n).Style.Fill.BackgroundColor = XLColor.FromHtml("#FDE5E5");
-            else if (x.Status == LoadingDocRules.AwaitingPostFill) ws.Row(n).Style.Fill.BackgroundColor = XLColor.FromHtml("#FFF4DB");
+            else if (x.Status == LoadingDocRules.Incomplete) ws.Row(n).Style.Fill.BackgroundColor = XLColor.FromHtml("#FFF4DB");
             n++;
         }
         ws.Row(1).Style.Font.Bold = true; ws.Row(1).Style.Fill.BackgroundColor = XLColor.FromHtml("#EBECFC");

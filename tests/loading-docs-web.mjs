@@ -50,21 +50,21 @@ ok(await page.locator('nav a[href="/loading-docs"]').innerText() === 'توثيق
 await page.click('nav a[href="/loading-docs"]');
 await page.waitForSelector('table.ld-table tbody tr');
 const num = async (k) => Number((await page.locator(`[data-total="${k}"]`).innerText()).replace(/,/g, ''));
-ok(await num('all') === totals.all && await num('awaiting') === totals.awaitingPostFill && await num('review') === totals.needsReview, `totals on top: all ${await num('all')}, awaiting ${await num('awaiting')}, needs review ${await num('review')}`);
+ok(await num('all') === totals.all && await num('awaiting') === totals.incomplete && await num('review') === totals.needsReview, `totals on top: all ${await num('all')}, awaiting ${await num('awaiting')}, needs review ${await num('review')}`);
 await page.waitForFunction(() => document.querySelectorAll('.ld-mini img').length >= 3);
 await page.screenshot({ path: join(out, 'ld-list.png'), fullPage: true });
 
 await page.click('button.stat.warn');
-await page.waitForFunction(n => document.querySelectorAll('table.ld-table tbody tr').length === n, totals.awaitingPostFill);
+await page.waitForFunction(n => document.querySelectorAll('table.ld-table tbody tr').length === n, totals.incomplete);
 const chips = await page.locator('table.ld-table tbody tr td:last-child .chip').allInnerTexts();
-ok(chips.length === totals.awaitingPostFill && chips.every(c => c === 'بانتظار صورة بعد التعبئة') && await page.locator(`tr[data-id="${rB.id}"]`).count() === 1, 'clicking «غير مكتملة» lists only operations awaiting the post-fill photo');
+ok(chips.length === totals.incomplete && chips.every(c => c.startsWith('بانتظار صورة')) && await page.locator(`tr[data-id="${rB.id}"]`).count() === 1, 'clicking «غير مكتملة» lists only operations still missing photos');
 await page.click('button.stat >> nth=0');
 await page.fill('input[name=q]', order.no); await page.selectOption('select[name=source]', 'Aramco'); await page.click('form.filter button.pri');
 await page.waitForFunction(() => document.querySelectorAll('table.ld-table tbody tr').length === 1);
 ok(await page.locator(`tr[data-id="${rA.id}"]`).count() === 1, 'search by order no. + filter «أرامكو» → the Aramco operation only');
 const rowText = await page.locator(`tr[data-id="${rA.id}"]`).innerText();
-ok(rowText.includes(order.no) && rowText.includes(tA.tripNo) && rowText.includes('سالم العتيبي') && rowText.includes(`ARM-W-${tag}`) && rowText.includes('مكتمل') && rowText.includes('11,980'),
-  'row: order no., trip no., driver, loading document no., loaded qty, status «مكتمل»');
+ok(rowText.includes(order.no) && rowText.includes(tA.tripNo) && rowText.includes('سالم العتيبي') && rowText.includes(`ARM-W-${tag}`) && rowText.includes('بانتظار صورة قبل التفريغ') && rowText.includes('مطلوبة: قبل التفريغ، بعد التفريغ') && rowText.includes('11,980'),
+  'row: order no., trip no., driver, loading document no., loaded qty, «بانتظار صورة قبل التفريغ» with the photos still required');
 
 await page.click(`tr[data-id="${rA.id}"]`);
 await page.waitForSelector('.ld-photos figure.ld-photo');

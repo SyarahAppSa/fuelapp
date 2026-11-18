@@ -5,10 +5,11 @@ import { api, blobUrl, can, download, fmt, ksa, post } from '../api'
 import { useMe } from '../App'
 import { Field, Panel, useAction } from '../ui'
 
-// «توثيق التعبئة»: the loading part of every fill report (tank before / after filling, loading document), linked to the order and the trip.
+// «توثيق التعبئة»: the four mandatory tank photos of every operation (start of filling, after filling, before unloading, after unloading)
+// and the loading document, in one record linked to the order and the trip; «مكتمل» once the four have arrived.
 // Viewing and downloading photos: Fill reports «View». «طلب إعادة التصوير»: Fill reports «Edit». Excel: Export, as in the other reports.
 
-type DocStatus = 'AwaitingPostFill' | 'Complete' | 'NeedsReview' | 'NotStarted'
+type DocStatus = 'Incomplete' | 'Complete' | 'NeedsReview' | 'NotStarted'
 type Source = 'Aramco' | 'Station' | 'MaysanYard'
 interface PhotoInfo { id: string; capturedAt?: string; uploadedAt: string; lat?: number; lng?: number; locationNote?: string; fromGallery: boolean; lateMinutes?: number; versions: number }
 interface Row {
@@ -16,8 +17,9 @@ interface Row {
   source: Source; sourceLabel: string; facility: string; city?: string; product: string; qtyRequested: number; loadedQty?: number
   loadingDocNo?: string; loadingDocNoFrom?: 'driver' | 'loading' | 'sourceRef'; loadingDocLabel: string
   preFill?: PhotoInfo; postFill?: PhotoInfo; loadingDoc?: PhotoInfo; firstPhotoAt: string; status: DocStatus; statusLabel: string; reasons: string[]; openRetakes: number; reportStatus: string
+  stages: { order: number; kind: string; stage: string; photo?: PhotoInfo }[]; missing: string[]
 }
-interface Totals { all: number; awaitingPostFill: number; needsReview: number; complete: number }
+interface Totals { all: number; incomplete: number; needsReview: number; complete: number }
 interface ListResp { totals: Totals; total: number; page: number; size: number; items: Row[] }
 interface Version { id: string; version: number; current: boolean; capturedAt?: string; uploadedAt: string; lat?: number; lng?: number; locationNote?: string; fromGallery: boolean; lateMinutes?: number; by?: string; retakeNote?: string }
 interface Slot { kind: string; stage: string; label: string; loading: boolean; openRetake?: { id: string; note: string; requestedAt: string; by?: string }; versions: Version[] }
@@ -26,8 +28,8 @@ interface DetailResp {
   retakeRequests: { id: string; kind: string; label: string; note: string; requestedAt: string; by?: string; resolvedAt?: string; resolvedAttachmentId?: string }[]
 }
 
-const statusChip: Record<DocStatus, string> = { AwaitingPostFill: 'st-AwaitingApproval', Complete: 'st-Approved', NeedsReview: 'st-UnderReview', NotStarted: 'st-WaitingLoad' }
-const statusOptions: [DocStatus, string][] = [['AwaitingPostFill', 'بانتظار صورة بعد التعبئة'], ['Complete', 'مكتمل'], ['NeedsReview', 'يحتاج مراجعة']]
+const statusChip: Record<DocStatus, string> = { Incomplete: 'st-AwaitingApproval', Complete: 'st-Approved', NeedsReview: 'st-UnderReview', NotStarted: 'st-WaitingLoad' }
+const statusOptions: [DocStatus, string][] = [['Incomplete', 'غير مكتمل (صور مطلوبة)'], ['Complete', 'مكتمل'], ['NeedsReview', 'يحتاج مراجعة']]
 const sourceOptions: [Source, string][] = [['Aramco', 'أرامكو'], ['Station', 'محطة'], ['MaysanYard', 'حوش ميسان']]
 const docFrom = { driver: 'أدخله السائق', loading: 'من سجل التحميل', sourceRef: 'رقم أمر التحميل' }
 
@@ -102,8 +104,8 @@ function LoadingList() {
       <div className="stats ld-stats">
         <button className={`stat ${f.status === '' ? 'on' : ''}`} onClick={() => pick('')} aria-pressed={f.status === ''}>
           <span className="stat-ic">{PAGE_ICONS.all}</span><span className="stat-tx"><span className="stat-l">كل عمليات التعبئة</span><span className="stat-v" data-total="all">{fmt(t?.all)}</span></span></button>
-        <button className={`stat warn ${f.status === 'AwaitingPostFill' ? 'on' : ''}`} onClick={() => pick('AwaitingPostFill')} aria-pressed={f.status === 'AwaitingPostFill'}>
-          <span className="stat-ic">{PAGE_ICONS.wait}</span><span className="stat-tx"><span className="stat-l">غير مكتملة (بانتظار صورة بعد التعبئة)</span><span className="stat-v" data-total="awaiting">{fmt(t?.awaitingPostFill)}</span></span></button>
+        <button className={`stat warn ${f.status === 'Incomplete' ? 'on' : ''}`} onClick={() => pick('Incomplete')} aria-pressed={f.status === 'Incomplete'}>
+          <span className="stat-ic">{PAGE_ICONS.wait}</span><span className="stat-tx"><span className="stat-l">غير مكتملة (صور ما زالت مطلوبة)</span><span className="stat-v" data-total="awaiting">{fmt(t?.incomplete)}</span></span></button>
         <button className={`stat crit ${f.status === 'NeedsReview' ? 'on' : ''}`} onClick={() => pick('NeedsReview')} aria-pressed={f.status === 'NeedsReview'}>
           <span className="stat-ic">{PAGE_ICONS.review}</span><span className="stat-tx"><span className="stat-l">يحتاج مراجعة</span><span className="stat-v" data-total="review">{fmt(t?.needsReview)}</span></span></button>
       </div>
@@ -123,17 +125,18 @@ function LoadingList() {
       <Panel title={`العمليات (${list.data?.total ?? 0})`}>
         {list.error && <div className="err">{(list.error as Error).message}</div>}
         <div className="tblw"><table className="ld-table">
-          <thead><tr><th>أول صورة</th><th>الطلب / الرحلة</th><th>السائق / الشاحنة</th><th>مصدر التحميل</th><th>قبل / بعد التعبئة</th><th>الوقود (لتر)</th><th>سند التحميل</th><th>حالة التوثيق</th></tr></thead>
+          <thead><tr><th>أول صورة</th><th>الطلب / الرحلة</th><th>السائق / الشاحنة</th><th>مصدر التحميل</th><th>الصور الأربع</th><th>الوقود (لتر)</th><th>سند التحميل</th><th>حالة التوثيق</th></tr></thead>
           <tbody>{list.data?.items.map(r => (
             <tr key={r.id} className={`click ${r.status === 'NeedsReview' ? 'flag' : ''}`} onClick={() => nav(`/loading-docs/${r.id}`)} data-id={r.id}>
               <td className="num">{ksa(r.firstPhotoAt)}</td>
               <td className="num"><b>{r.orderNo ?? '—'}</b><div className="sub">{r.tripNo}</div></td>
               <td>{r.driverName}<div className="sub num">{r.plate}</div></td>
               <td><span className={`chip src-${r.source}`}>{r.sourceLabel}</span><div className="sub">{r.facility}{r.city && ` — ${r.city}`}</div></td>
-              <td><span className="ld-pair"><Mini p={r.preFill} label="قبل" /><Mini p={r.postFill} label="بعد" /></span></td>
+              <td><span className="ld-pair">{r.stages.map(x => <Mini key={x.kind} p={x.photo} label={`${x.order}. ${x.stage}`} />)}</span></td>
               <td className="num">{r.product}<div className="sub">المطلوب {fmt(r.qtyRequested)}</div><div className="sub">المحمّل <b>{fmt(r.loadedQty)}</b></div></td>
               <td className="num">{r.loadingDocNo ?? '—'}{r.loadingDoc && <div className="sub">📎 صورة السند</div>}</td>
               <td><span className={`chip ${statusChip[r.status]}`}>{r.statusLabel}</span>
+                {r.missing.length > 0 && <div className="sub">مطلوبة: {r.missing.join('، ')}</div>}
                 {r.reasons.length > 0 && <ul className="ld-reasons">{r.reasons.map((x, i) => <li key={i}>{x}</li>)}</ul>}</td>
             </tr>))}</tbody>
         </table></div>
@@ -146,7 +149,7 @@ function LoadingList() {
   )
 }
 
-function PhotoCard({ slot, rec, canRetake, onZoom, children }: { slot: Slot; rec: Row; canRetake: boolean; onZoom: (url: string, label: string, id: string) => void; children?: ReactNode }) {
+function PhotoCard({ slot, rec, canRetake, onZoom, children, title }: { slot: Slot; rec: Row; canRetake: boolean; onZoom: (url: string, label: string, id: string) => void; children?: ReactNode; title?: string }) {
   const cur = slot.versions[slot.versions.length - 1]
   const url = useBlob(cur?.id)
   const act = useAction()
@@ -160,9 +163,9 @@ function PhotoCard({ slot, rec, canRetake, onZoom, children }: { slot: Slot; rec
   }
   return (
     <figure className={`ld-photo ${slot.openRetake ? 'retake' : ''}`} data-kind={slot.kind}>
-      <figcaption className="ld-photo-h"><b>{slot.label}</b>{slot.versions.length > 1 && <span className="chip st-WaitingLoad">النسخة {slot.versions.length}</span>}</figcaption>
+      <figcaption className="ld-photo-h"><b>{title ?? slot.label}</b>{slot.versions.length > 1 && <span className="chip st-WaitingLoad">النسخة {slot.versions.length}</span>}</figcaption>
       {cur ? (url ? <button className="frp-img" onClick={() => onZoom(url, slot.label, cur.id)} aria-label={`تكبير صورة ${slot.label}`}><img src={url} alt={slot.label} /></button> : <div className="frp-img empty">جارٍ التحميل…</div>)
-        : <div className="frp-img empty missing">{slot.kind === 'loading-doc' ? 'لم يُرفق (اختياري)' : 'لم تصل بعد'}</div>}
+        : <div className="frp-img empty missing">{slot.kind === 'loading-doc' ? 'لم يُرفق (اختياري)' : 'مطلوبة — لم تصل بعد'}</div>}
       {cur && <div className="ld-meta">
         <div><span className="sub">وقت الالتقاط (السعودية)</span> <b className="num">{ksa(cur.capturedAt ?? cur.uploadedAt)}</b></div>
         <div><span className="sub">وصلت إلى النظام</span> <span className="num">{ksa(cur.uploadedAt)}</span>{cur.lateMinutes != null && <span className="chip st-AwaitingApproval" style={{ marginInlineStart: 6 }}>{lateText(cur.lateMinutes)}</span>}</div>
@@ -175,7 +178,7 @@ function PhotoCard({ slot, rec, canRetake, onZoom, children }: { slot: Slot; rec
       {act.banner}
       <div className="row" style={{ gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
         {cur && <button className="btn" onClick={() => act.run(() => download(`/api/attachments/${cur.id}`, `${rec.tripNo}-${slot.kind}-v${cur.version}.jpg`), 'نُزّلت الصورة.')}>تنزيل</button>}
-        {canRetake && !slot.openRetake && !asking && <button className="btn" onClick={() => setAsking(true)}>طلب إعادة التصوير</button>}
+        {canRetake && cur && !slot.openRetake && !asking && <button className="btn" onClick={() => setAsking(true)}>طلب إعادة التصوير</button>}
       </div>
       {asking && <form className="ld-ask" onSubmit={ask}>
         <Field label="ملاحظة للسائق (مطلوبة)"><textarea name="note" required minLength={3} maxLength={500} rows={2} placeholder="مثال: الصورة مظلمة ولا يظهر مستوى الوقود" /></Field>
@@ -232,12 +235,15 @@ function LoadingRecord({ id }: { id: string }) {
       </section>
 
       {r.reasons.length > 0 && <div className="card" style={{ padding: 12, marginTop: 12, color: 'var(--crit)' }}><b>أسباب المراجعة:</b><ul className="ld-reasons">{r.reasons.map((x, i) => <li key={i}>{x}</li>)}</ul></div>}
-      {r.status === 'AwaitingPostFill' && <div className="card" style={{ padding: 12, marginTop: 12 }}>وصلت صورة ما قبل التعبئة؛ بانتظار صورة الصهريج بعد التعبئة من السائق.</div>}
+      {r.missing.length > 0 && <div className="card" style={{ padding: 12, marginTop: 12 }}>وصلت {4 - r.missing.length} من 4 صور. ما زالت مطلوبة من السائق: <b>{r.missing.join('، ')}</b>.</div>}
 
-      <Panel title="صور التعبئة">
+      <Panel title={`صور التوثيق الإلزامية (${4 - r.missing.length} من 4)`}>
+        <div className="ld-photos ld-four">
+          {r.stages.map(x => <PhotoCard key={x.kind} slot={slot(x.kind)} title={`${x.order}. ${x.stage}`} rec={r} canRetake={d.canRequestRetake} onZoom={onZoom} />)}
+        </div>
+      </Panel>
+      <Panel title="سند التحميل">
         <div className="ld-photos">
-          <PhotoCard slot={slot('tank-pre-fill')} rec={r} canRetake={d.canRequestRetake} onZoom={onZoom} />
-          <PhotoCard slot={slot('tank-post-fill')} rec={r} canRetake={d.canRequestRetake} onZoom={onZoom} />
           <PhotoCard slot={slot('loading-doc')} rec={r} canRetake={d.canRequestRetake} onZoom={onZoom}>
             <div className="sub" style={{ marginTop: 4 }}>{r.loadingDocLabel}: <b className="num">{r.loadingDocNo ?? '—'}</b></div>
           </PhotoCard>

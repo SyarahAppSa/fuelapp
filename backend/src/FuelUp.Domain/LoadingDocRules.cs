@@ -6,21 +6,31 @@ namespace FuelUp.Domain;
 /// </summary>
 public static class LoadingDocRules
 {
-    public const string PreFill = "tank-pre-fill", PostFill = "tank-post-fill", LoadingDoc = "loading-doc";
-    /// <summary>The photos that belong to loading. The first one of them to reach the server makes the record appear.</summary>
-    public static readonly string[] Kinds = [PreFill, PostFill, LoadingDoc];
+    public const string PreFill = "tank-pre-fill", PostFill = "tank-post-fill", Arrival = "tank-arrival", PostUnload = "tank-post-unload", LoadingDoc = "loading-doc";
 
-    public const string NotStarted = "NotStarted", AwaitingPostFill = "AwaitingPostFill", Complete = "Complete", NeedsReview = "NeedsReview";
-    public static readonly string[] Statuses = [AwaitingPostFill, Complete, NeedsReview];
+    /// <summary>The four mandatory photos of a loading-and-delivery operation, in the order the driver takes them.</summary>
+    public static readonly (string Kind, string Stage)[] Required =
+        [(PreFill, "عند بدء التعبئة"), (PostFill, "بعد التعبئة"), (Arrival, "قبل التفريغ"), (PostUnload, "بعد التفريغ")];
+    public static string StageLabel(string kind) => Required.FirstOrDefault(r => r.Kind == kind).Stage ?? (kind == LoadingDoc ? "سند التحميل" : kind);
+
+    /// <summary>The photos of this record. The first one of them to reach the server makes the record appear.</summary>
+    public static readonly string[] Kinds = [PreFill, PostFill, Arrival, PostUnload, LoadingDoc];
+
+    public const string NotStarted = "NotStarted", Incomplete = "Incomplete", Complete = "Complete", NeedsReview = "NeedsReview";
+    /// <summary>Older name of <see cref="Incomplete"/> (when only the two loading photos were tracked); still accepted as a filter.</summary>
+    public const string AwaitingPostFill = "AwaitingPostFill";
+    public static readonly string[] Statuses = [Incomplete, Complete, NeedsReview];
+    public static string Normalize(string? status) => status == AwaitingPostFill ? Incomplete : status ?? "";
 
     /// <summary>A photo uploaded later than this after it was taken is shown as «وصلت بعد …» (sent from the offline queue).</summary>
     public static readonly TimeSpan LateUpload = TimeSpan.FromMinutes(10);
     /// <summary>Grace for typing the loaded quantity after the post-fill photo before it becomes a review reason.</summary>
     public static readonly TimeSpan QtyGrace = TimeSpan.FromMinutes(30);
 
-    public static string Label(string status) => status switch
+    /// <param name="missing">Stage names still required (only used for «بانتظار صورة …»).</param>
+    public static string Label(string status, IReadOnlyList<string>? missing = null) => status switch
     {
-        AwaitingPostFill => "بانتظار صورة بعد التعبئة", Complete => "مكتمل", NeedsReview => "يحتاج مراجعة", _ => "لم تبدأ",
+        Incomplete => missing is { Count: > 0 } ? $"بانتظار صورة {missing[0]}" : "غير مكتمل", Complete => "مكتمل", NeedsReview => "يحتاج مراجعة", _ => "لم تبدأ",
     };
 
     public static string SourceKey(StationType t) => t switch { StationType.Aramco => "Aramco", StationType.MaysanYard => "MaysanYard", _ => "Station" };
@@ -33,25 +43,25 @@ public static class LoadingDocRules
     public static int? LateMinutes(DateTimeOffset? captured, DateTimeOffset uploaded) =>
         captured is { } c && uploaded - c > LateUpload ? (int)Math.Round((uploaded - c).TotalMinutes) : null;
 
-    /// <param name="latest">The newest photo of each loading slot (<see cref="Kinds"/>).</param>
+    /// <param name="latest">The newest photo of each slot of the record (<see cref="Kinds"/>).</param>
     /// <param name="open">Open retake requests on any slot of the report.</param>
-    public static (string Status, List<string> Reasons) Evaluate(IReadOnlyCollection<Photo> latest, IReadOnlyCollection<OpenRetake> open, decimal? loadedQty, bool postFillConfirmed, DateTimeOffset now)
+    /// <returns>Status, review reasons, and the stage names still required (in order).</returns>
+    public static (string Status, List<string> Reasons, List<string> Missing) Evaluate(IReadOnlyCollection<Photo> latest, IReadOnlyCollection<OpenRetake> open, decimal? loadedQty, bool postFillConfirmed, DateTimeOffset now)
     {
-        var loading = latest.Where(p => Kinds.Contains(p.Kind)).ToList();
-        if (loading.Count == 0) return (NotStarted, []);
+        var mine = latest.Where(p => Kinds.Contains(p.Kind)).ToList();
+        var missing = Required.Where(r => mine.All(p => p.Kind != r.Kind)).Select(r => r.Stage).ToList();
+        if (mine.Count == 0) return (NotStarted, [], missing);
         var reasons = new List<string>();
         foreach (var r in open) reasons.Add($"طلب إعادة تصوير ({r.Label}): {r.Note}");
-        var pre = loading.FirstOrDefault(p => p.Kind == PreFill);
-        var post = loading.FirstOrDefault(p => p.Kind == PostFill);
-        if (pre is null) reasons.Add("لا توجد صورة للصهريج قبل التعبئة");
-        foreach (var p in loading.OrderBy(p => Array.IndexOf(Kinds, p.Kind)))
+        foreach (var p in mine.OrderBy(p => Array.IndexOf(Kinds, p.Kind)))
         {
             if (p.Lat is null) reasons.Add($"صورة {p.Label} بدون موقع: {p.LocationNote ?? "لم يُرسل الموقع"}");
             if (p.FromGallery) reasons.Add($"وقت التقاط صورة {p.Label} غير موثوق (أقدم من 48 ساعة عند رفعها أو غير مُرسل)");
         }
+        var post = mine.FirstOrDefault(p => p.Kind == PostFill);
         if (post is not null && loadedQty is not > 0 && (postFillConfirmed || now - post.UploadedAt > QtyGrace))
             reasons.Add("الكمية المحمّلة غير مسجّلة بعد التعبئة");
-        if (reasons.Count > 0) return (NeedsReview, reasons);
-        return (post is null ? AwaitingPostFill : Complete, reasons);
+        if (reasons.Count > 0) return (NeedsReview, reasons, missing);
+        return (missing.Count > 0 ? Incomplete : Complete, reasons, missing);
     }
 }

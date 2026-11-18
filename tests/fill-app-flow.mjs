@@ -86,7 +86,7 @@ if (mode === 'loading') {
   // 1. only the pre-fill photo has arrived
   if (await wait(1) !== null) {
     const l = await record(), r = l.items?.[0];
-    const good = l.total === 1 && r.status === 'AwaitingPostFill' && r.orderNo === order.no && r.tripNo === trip.tripNo && r.preFill?.lat === 24.7136 && !r.postFill;
+    const good = l.total === 1 && r.status === 'Incomplete' && r.orderNo === order.no && r.tripNo === trip.tripNo && r.preFill?.lat === 24.7136 && !r.postFill;
     ok(good, `pre-fill photo sent from the app → record «${r?.statusLabel}» under order ${r?.orderNo} / trip ${r?.tripNo}`);
     answer(1, good, JSON.stringify(r));
   }
@@ -97,7 +97,7 @@ if (mode === 'loading') {
     const l = await record(), r = l.items?.[0];
     first = r;
     const cap = Date.parse(r?.postFill?.capturedAt), up = Date.parse(r?.postFill?.uploadedAt);
-    ok(l.total === 1 && r.status === 'Complete', `after sync: still ONE record (${l.total}), «${r?.statusLabel}»`);
+    ok(l.total === 1 && r.status === 'Incomplete' && r.statusLabel === 'بانتظار صورة قبل التفريغ' && r.stages[1].photo, `after sync: still ONE record (${l.total}), 2 of 4 photos → «${r?.statusLabel}»`);
     ok(r?.preFill?.id && r?.postFill?.id && r.orderNo === order.no, 'both photos under the same order / record');
     ok(Math.abs(cap - Date.parse(taken)) < 1500 && up - cap >= 7000, `post-fill capturedAt = the moment of capture in the app (${new Date(cap).toISOString()}), ${Math.round((up - cap) / 1000)} s before it reached the server`);
     ok(r?.postFill?.lat === 24.7136 && r.postFill.lng === 46.6753, `coordinates kept: ${r?.postFill?.lat}, ${r?.postFill?.lng}`);
@@ -107,7 +107,7 @@ if (mode === 'loading') {
     writeFileSync(file, Buffer.from(await img.arrayBuffer()));
     const ksa = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Riyadh', dateStyle: 'short', timeStyle: 'medium' }).format(new Date(cap));
     ok(img.status === 200, `post-fill photo downloaded to ${file} — its stamp should read ${ksa} (KSA) and 24.71360, 46.67530`);
-    answer(2, l.total === 1 && r.status === 'Complete' && up - cap >= 7000, JSON.stringify(r));
+    answer(2, l.total === 1 && r.status === 'Incomplete' && r.stages[1].photo && up - cap >= 7000, JSON.stringify(r));
   }
   // 3. report sent → the supervisor asks for the post-fill photo again
   if (await wait(3) !== null) {

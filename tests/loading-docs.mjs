@@ -45,14 +45,14 @@ let l = await list(sup, `q=${encodeURIComponent(tA.tripNo)}`);
 ok(rA.id && l.total === 0 && (await list(sup)).totals.all === before.totals.all, 'a started report with no photo does not appear in «توثيق التعبئة» («لم تبدأ»)');
 let p = await photo(d1, rA.id, 'tank-pre-fill');
 let row = await rowOf(rA.id);
-ok(p.s === 200 && row?.status === 'AwaitingPostFill' && row.statusLabel === 'بانتظار صورة بعد التعبئة', `first photo (pre-fill) → record appears: «${row?.statusLabel}»`);
+ok(p.s === 200 && row?.status === 'Incomplete' && row.statusLabel === 'بانتظار صورة بعد التعبئة' && row.missing.join() === 'بعد التعبئة,قبل التفريغ,بعد التفريغ' && row.stages.length === 4 && row.stages[0].photo && !row.stages[1].photo, `first photo (pre-fill) → record appears: «${row?.statusLabel}»`);
 ok(row?.orderNo === order.no && row.tripNo === tA.tripNo && row.tripId === tA.tripId, `linked to order no. ${row?.orderNo} and trip no. ${row?.tripNo}`);
 ok(row?.driverName === 'سالم العتيبي' && row.plate === me1.vehicles[0].plate, `trip data: driver ${row?.driverName}, plate ${row?.plate}`);
 ok(row?.source === 'Aramco' && row.sourceLabel === 'أرامكو' && row.facility === aramco.name, `loading source «${row?.sourceLabel}» · ${row?.facility}`);
 ok(row?.product === 'ديزل' && row.qtyRequested === 12000 && row.preFill?.id && !row.postFill && row.preFill.lat === 26.64, 'fuel data and the pre-fill photo with its coordinates; no post-fill photo yet');
 ok(row?.loadingDocNo === `LO-${tag}-A` && row.loadingDocNoFrom === 'sourceRef' && row.loadingDocLabel === 'رقم سند أرامكو', `no number typed yet → falls back to the loading order ref ${row?.loadingDocNo}`);
 
-// ── 2. post-fill photo (sent 30 min after it was taken) + optional loading document → same record, «مكتمل» ────────
+// ── 2. post-fill photo (sent 30 min after it was taken) + optional loading document → same record, still 2 of 4 ────────
 await stage(rA.id, 'pre-fill');
 const taken = new Date(Date.now() - 30 * 60000).toISOString();
 p = await photo(d1, rA.id, 'tank-post-fill', GPS, { capturedAt: taken });
@@ -63,7 +63,7 @@ ok(s.s === 200 && s.j.loadingDocNo === `ARM-${tag}` && s.j.photos.length === 6 &
 ok(!s.j.missing.some(m => m.includes('سند')), 'the loading document is not in the missing list');
 row = await rowOf(rA.id);
 l = await list(sup, `q=${encodeURIComponent(tA.tripNo)}`);
-ok(l.total === 1 && row?.status === 'Complete' && row.statusLabel === 'مكتمل', `post-fill photo joins the SAME record (${l.total} row, same id) → «${row?.statusLabel}»`);
+ok(l.total === 1 && row?.status === 'Incomplete' && row.statusLabel === 'بانتظار صورة قبل التفريغ' && row.missing.join() === 'قبل التفريغ,بعد التفريغ', `post-fill photo joins the SAME record (${l.total} row, same id) → «${row?.statusLabel}» (2 of 4)`);
 ok(row?.postFill?.capturedAt && Date.parse(row.postFill.capturedAt) < Date.parse(row.postFill.uploadedAt) && row.postFill.lateMinutes >= 29 && row.postFill.lateMinutes <= 32,
   `capture time kept (not upload time): sent ${row?.postFill?.lateMinutes} min later → «وصلت بعد …»`);
 ok(row?.preFill?.lateMinutes == null, 'a photo sent right away has no delay note');
@@ -83,8 +83,13 @@ ok(row?.status === 'NeedsReview' && row.reasons.some(x => x.includes('48 ساع�
 // ── 4. retake request on a sent report ───────────────────────────────────────────────────────────────────────────
 for (const k of ['tank-arrival', 'meter-before']) await photo(d1, rA.id, k);
 await stage(rA.id, 'arrival', { meterBefore: 50000 });
+row = await rowOf(rA.id);
+ok(row?.status === 'Incomplete' && row.statusLabel === 'بانتظار صورة بعد التفريغ' && row.stages[2].stage === 'قبل التفريغ' && row.stages[2].photo, `photo 3 «قبل التفريغ» joins the same record → «${row?.statusLabel}» (3 of 4)`);
 for (const k of ['tank-post-unload', 'meter-after']) await photo(d1, rA.id, k);
 await stage(rA.id, 'post-unload', { meterAfter: 61950, tankState: 'فارغ' });
+row = await rowOf(rA.id);
+ok(row?.status === 'Complete' && row.statusLabel === 'مكتمل' && row.missing.length === 0 && row.stages.map(x => x.stage).join() === 'عند بدء التعبئة,بعد التعبئة,قبل التفريغ,بعد التفريغ' && row.stages.every(x => x.photo),
+  'the four photos (start of filling, after filling, before unloading, after unloading) in one record → «مكتمل»');
 const sub = (await P(d1, `/api/fill-reports/${rA.id}/submit`)).j;
 ok(sub.status === 'Submitted', 'report A sent (locked for the driver)');
 ok((await P(sup, `/api/fill-reports/${rA.id}/retakes`, { kind: 'tank-post-fill', note: '' })).s === 400, 'retake request without a note refused');
@@ -147,11 +152,12 @@ const rD = (await P(d1, '/api/fill-reports/start', { tripId: (await dispatch(ara
 await photo(d1, rD.id, 'tank-pre-fill');
 const all = await list(sup);
 const t = all.totals;
-ok(t.all === before.totals.all + 4 && t.awaitingPostFill === before.totals.awaitingPostFill + 1 && t.needsReview === before.totals.needsReview + 2 && t.complete === before.totals.complete + 1,
-  `totals: all ${t.all}, awaiting post-fill ${t.awaitingPostFill}, needs review ${t.needsReview}, complete ${t.complete}`);
-ok(t.all === t.awaitingPostFill + t.needsReview + t.complete && all.total === t.all, 'totals add up');
-const filtered = await list(sup, 'status=AwaitingPostFill');
-ok(filtered.total === t.awaitingPostFill && filtered.totals.all === t.all && filtered.items.every(x => x.status === 'AwaitingPostFill'), 'clicking a total filters the list; the totals stay');
+ok(t.all === before.totals.all + 4 && t.incomplete === before.totals.incomplete + 1 && t.needsReview === before.totals.needsReview + 2 && t.complete === before.totals.complete + 1,
+  `totals: all ${t.all}, incomplete ${t.incomplete}, needs review ${t.needsReview}, complete ${t.complete}`);
+ok(t.all === t.incomplete + t.needsReview + t.complete && all.total === t.all, 'totals add up');
+const filtered = await list(sup, 'status=Incomplete');
+ok(filtered.total === t.incomplete && filtered.totals.all === t.all && filtered.items.every(x => x.status === 'Incomplete'), 'clicking a total filters the list; the totals stay');
+ok((await list(sup, 'status=AwaitingPostFill')).total === t.incomplete, 'the older filter name still works');
 
 // ── 7. Excel ─────────────────────────────────────────────────────────────────────────────────────────────────────
 const x = await fetch(`${B}/api/fill-reports/loading?format=xlsx&q=${order.no}`, { headers: { authorization: 'Bearer ' + admin } });
