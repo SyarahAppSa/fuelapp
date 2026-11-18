@@ -55,6 +55,7 @@ public class FuelUpDb(DbContextOptions<FuelUpDb> options, TenantContext? tenant 
     public DbSet<TripCounter> TripCounters => Set<TripCounter>();
     public DbSet<AttendanceRecord> Attendance => Set<AttendanceRecord>();
     public DbSet<FillReport> FillReports => Set<FillReport>();
+    public DbSet<RetakeRequest> RetakeRequests => Set<RetakeRequest>();
     public DbSet<CustomerOrder> Orders => Set<CustomerOrder>();
     public DbSet<OrderCounter> OrderCounters => Set<OrderCounter>();
     public DbSet<DocumentType> DocumentTypes => Set<DocumentType>();
@@ -154,6 +155,12 @@ public class FuelUpDb(DbContextOptions<FuelUpDb> options, TenantContext? tenant 
             e.Property(x => x.Status).HasConversion<string>();
             e.Property(x => x.Outcome).HasConversion<string>();
             e.Ignore(x => x.DeliveredQty);
+        });
+        b.Entity<RetakeRequest>(e =>
+        {
+            e.ToTable("retake_requests");
+            e.HasIndex(x => x.ReportId);
+            e.HasIndex(x => new { x.ReportId, x.Kind }).IsUnique().HasFilter("resolved_at IS NULL").HasDatabaseName("ux_retake_requests_open");   // one open request per photo slot
         });
         b.Entity<CustomerOrder>(e =>
         {

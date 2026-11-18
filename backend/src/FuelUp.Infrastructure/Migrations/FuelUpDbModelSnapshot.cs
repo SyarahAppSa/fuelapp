@@ -853,6 +853,10 @@ namespace FuelUp.Infrastructure.Migrations
                         .HasColumnType("numeric(14,2)")
                         .HasColumnName("loaded_qty");
 
+                    b.Property<string>("LoadingDocNo")
+                        .HasColumnType("text")
+                        .HasColumnName("loading_doc_no");
+
                     b.Property<string>("LoadingSite")
                         .IsRequired()
                         .HasColumnType("text")
@@ -1996,6 +2000,60 @@ namespace FuelUp.Infrastructure.Migrations
                         .HasDatabaseName("ix_refresh_tokens_token_hash");
 
                     b.ToTable("refresh_tokens", (string)null);
+                });
+
+            modelBuilder.Entity("FuelUp.Domain.RetakeRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("note");
+
+                    b.Property<Guid>("ReportId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("report_id");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_at");
+
+                    b.Property<Guid>("RequestedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("requested_by");
+
+                    b.Property<DateTimeOffset?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("resolved_at");
+
+                    b.Property<Guid?>("ResolvedAttachmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("resolved_attachment_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_retake_requests");
+
+                    b.HasIndex("ReportId")
+                        .HasDatabaseName("ix_retake_requests_report_id");
+
+                    b.HasIndex("ReportId", "Kind")
+                        .IsUnique()
+                        .HasDatabaseName("ux_retake_requests_open")
+                        .HasFilter("resolved_at IS NULL");
+
+                    b.ToTable("retake_requests", (string)null);
                 });
 
             modelBuilder.Entity("FuelUp.Domain.Setting", b =>

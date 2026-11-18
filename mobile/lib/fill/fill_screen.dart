@@ -99,6 +99,8 @@ class _FillReportsTabState extends State<FillReportsTab> {
     final waiting = ob.pendingFor(row['tripId'] as String) > 0;
     final started = local != null || rep != null;
     final done = (local?.stagesDone.length ?? rep?['stagesDone'] as int? ?? 0);
+    // the list from the server is the freshest source of open «طلب إعادة التصوير»; the phone's copy covers offline
+    final retakes = ((rep?['retakes'] as List?) ?? local?.retakes ?? const []).cast<Map>();
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
@@ -108,6 +110,15 @@ class _FillReportsTabState extends State<FillReportsTab> {
             Expanded(child: Text('${row['tripNo']} · ${row['plate'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))),
             if (waiting) const _Chip('بانتظار المزامنة', Brand.warn) else if (status != null) _Chip(reportStatusLabel[status] ?? status, reportStatusColor(status)),
           ]),
+          if (retakes.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Row(children: [
+                const _Chip('مطلوب إعادة تصوير', Brand.warn),
+                const SizedBox(width: 8),
+                Expanded(child: Text(retakes.map((x) => '${slotLabel(x['kind'] as String)}: ${x['note']}').join(' · '), style: const TextStyle(color: Brand.warn, fontWeight: FontWeight.w700, fontSize: 13))),
+              ]),
+            ),
           const SizedBox(height: 4),
           if (row['orderNo'] != null) Text('طلب العميل ${row['orderNo']}${row['customerRef'] != null ? ' · أمر الشراء ${row['customerRef']}' : ''}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
           Text('${row['customer'] ?? ''} — ${row['site'] ?? ''}'),
@@ -117,7 +128,7 @@ class _FillReportsTabState extends State<FillReportsTab> {
           FilledButton.icon(
             onPressed: () => _open(row),
             icon: Icon(started ? Icons.arrow_back : Icons.play_arrow),
-            label: Text(!started ? 'ابدأ التوثيق' : (status == 'Draft' || status == 'Returned' || status == null) ? 'متابعة التوثيق' : 'عرض التقرير'),
+            label: Text(!started ? 'ابدأ التوثيق' : retakes.isNotEmpty ? 'إعادة التصوير المطلوبة' : (status == 'Draft' || status == 'Returned' || status == null) ? 'متابعة التوثيق' : 'عرض التقرير'),
           ),
         ]),
       ),
@@ -270,7 +281,7 @@ class _FillReportScreenState extends State<FillReportScreen> {
         // date, time and place burnt into the picture itself
         bytes = await PhotoStamp.apply(raw, [
           '${slot.label} · ${PhotoStamp.ltr('${_info['tripNo'] ?? ''}')}',
-          'التاريخ والوقت: ${PhotoStamp.when(at)}',
+          'التاريخ والوقت (السعودية): ${PhotoStamp.when(at.toUtc().add(const Duration(hours: 3)))}',
           loc != null ? 'الموقع: ${PhotoStamp.ltr('${loc.lat.toStringAsFixed(5)}, ${loc.lng.toStringAsFixed(5)}')}' : 'الموقع: غير متاح — $note',
         ]);
       } catch (_) {
@@ -339,6 +350,7 @@ class _FillReportScreenState extends State<FillReportScreen> {
     switch (stage) {
       case 'post-fill':
         body['loadedQty'] = parseNum(c('loadedQty').text);
+        if (c('loadingDocNo').text.trim().isNotEmpty) body['loadingDocNo'] = c('loadingDocNo').text.trim();
       case 'arrival':
         body['meterBefore'] = parseNum(c('meterBefore').text);
         if (c('meterSerial').text.trim().isNotEmpty) body['meterSerial'] = c('meterSerial').text.trim();
@@ -401,6 +413,7 @@ class _FillReportScreenState extends State<FillReportScreen> {
             _stepper(),
             const SizedBox(height: 12),
             if (r.status == 'Returned' && r.server?['reviewNote'] != null) _banner('أعاد فريق العمليات التقرير: ${r.server!['reviewNote']}', Brand.crit),
+            for (final x in r.retakes) _banner('طلب المشرف إعادة تصوير «${slotLabel(x['kind'] as String)}»: ${x['note']}', Brand.warn),
             if (r.lastError != null) _banner(r.lastError!, Brand.crit),
             if (_localError != null) _banner(_localError!, Brand.crit),
             if (_step < 4) _stageBody(stages[_step]) else _review(),
@@ -460,29 +473,47 @@ class _FillReportScreenState extends State<FillReportScreen> {
     ]);
   }
 
-  Widget _photoSlot(Slot s, {bool optional = false}) {
+  Map<String, dynamic>? _serverPhoto(String kind) => [...((r.server?['photos'] as List?) ?? []), ...((r.server?['optionalPhotos'] as List?) ?? [])]
+      .cast<Map<String, dynamic>>().where((x) => x['kind'] == kind && x['id'] != null).firstOrNull;
+
+  Widget _photoSlot(Slot s, {bool optional = false, String? optionalNote}) {
     final p = r.photos[s.kind];
-    final serverPhoto = ((r.server?['photos'] as List?) ?? []).cast<Map<String, dynamic>>().where((x) => x['kind'] == s.kind && x['id'] != null).firstOrNull;
+    final serverPhoto = _serverPhoto(s.kind);
     final has = p != null || serverPhoto != null;
+    // «طلب إعادة التصوير»: highlighted, with the supervisor's note; this slot can be retaken even on a sent or approved report
+    final retake = r.retakeFor(s.kind);
+    final retakeWaiting = retake != null && ob.jobs.any((j) => j.tripId == widget.tripId && j.type == 'photo' && j.kind == s.kind);
+    final canTake = editable || (retake != null && !retakeWaiting);
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      shape: retake != null ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Brand.warn, width: 2)) : null,
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text(s.label + (optional ? ' (اختياري عند تعذّر التفريغ)' : ''), style: const TextStyle(fontWeight: FontWeight.w800)),
+          Text(s.label + (optional ? ' (اختياري عند تعذّر التفريغ)' : optionalNote ?? ''), style: const TextStyle(fontWeight: FontWeight.w800)),
+          if (retake != null)
+            Container(
+              margin: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: Brand.warn.withValues(alpha: .12), borderRadius: BorderRadius.circular(10)),
+              child: Text('مطلوب إعادة التصوير: ${retake['note']}${retakeWaiting ? '\n⏳ الصورة الجديدة بانتظار المزامنة' : ''}', style: const TextStyle(color: Brand.warn, fontWeight: FontWeight.w800)),
+            ),
           const SizedBox(height: 8),
           if (has) ...[
             ClipRRect(borderRadius: BorderRadius.circular(10), child: SizedBox(height: 170, child: PhotoThumb(local: p, serverId: p?.serverId ?? serverPhoto?['id'] as String?))),
             const SizedBox(height: 6),
             Text(_photoMeta(p, serverPhoto), style: const TextStyle(fontSize: 12)),
-            if (editable) TextButton.icon(onPressed: () => _take(s), icon: const Icon(Icons.refresh), label: const Text('إعادة التصوير')),
-          ] else if (editable)
+            if (retake != null && canTake)
+              FilledButton.icon(onPressed: () => _take(s), style: FilledButton.styleFrom(backgroundColor: Brand.warn), icon: const Icon(Icons.photo_camera), label: const Text('إعادة التصوير'))
+            else if (editable)
+              TextButton.icon(onPressed: () => _take(s), icon: const Icon(Icons.refresh), label: const Text('إعادة التصوير')),
+          ] else if (canTake)
             SizedBox(
               height: 72,
               child: FilledButton.icon(onPressed: () => _take(s), icon: const Icon(Icons.photo_camera, size: 30), label: Text('صوّر: ${s.label}', style: const TextStyle(fontSize: 16))),
             )
           else
-            const Text('لم تُلتقط', style: TextStyle(color: Brand.crit)),
+            Text(optionalNote != null ? 'لم يُرفق' : 'لم تُلتقط', style: TextStyle(color: optionalNote != null ? null : Brand.crit)),
         ]),
       ),
     );
@@ -527,7 +558,11 @@ class _FillReportScreenState extends State<FillReportScreen> {
         if (_outcome != 'Full') _field('outcomeReason', _outcome == 'Partial' ? 'سبب التفريغ الجزئي' : 'سبب تعذّر التفريغ', number: false, help: 'صوّر ما يثبت السبب إن أمكن (مثل امتلاء خزان العميل).'),
       ],
       for (final s in slots.where((s) => s.stage == stage)) _photoSlot(s, optional: failed),
-      if (stage == 'post-fill') _field('loadedQty', 'الكمية المحمّلة (لتر)', help: r.server?['stages']?['postFill']?['loadedFromTrip'] == true ? 'من سند التحميل؛ عدّلها إن اختلفت.' : null),
+      if (stage == 'post-fill') ...[
+        _field('loadedQty', 'الكمية المحمّلة (لتر)', help: r.server?['stages']?['postFill']?['loadedFromTrip'] == true ? 'من سند التحميل؛ عدّلها إن اختلفت.' : null),
+        _field('loadingDocNo', 'رقم سند التحميل / فاتورة المحطة (اختياري)', number: false, help: 'رقم سند أرامكو أو فاتورة المحطة إن وُجد.'),
+        for (final s in optionalSlots.where((s) => s.stage == stage)) _photoSlot(s, optionalNote: ' (اختياري)'),
+      ],
       if (stage == 'arrival') ...[
         _field('meterSerial', 'الرقم التسلسلي للعداد السري', number: false),
         _field('meterBefore', 'قراءة العداد قبل التفريغ'),
@@ -565,6 +600,8 @@ class _FillReportScreenState extends State<FillReportScreen> {
       if (r.locked)
         _banner('${r.status == 'Approved' ? 'معتمد' : 'تم إرسال التقرير'} · رقم التقرير ${r.server?['no']}${r.status == 'NeedsReview' ? '\nبحاجة إلى مراجعة: ${r.server?['reviewReasons'] ?? ''}' : ''}', r.status == 'NeedsReview' ? Brand.warn : Brand.ok),
       if (r.submitted && waiting) _banner('بانتظار المزامنة: سيُرسل التقرير تلقائيًا عند عودة الاتصال.', Brand.warn),
+      for (final x in r.retakes)
+        if (allSlots.where((s) => s.kind == x['kind']).firstOrNull case final s?) _photoSlot(s, optionalNote: optionalSlots.contains(s) ? ' (اختياري)' : null),
       GridView.count(
         crossAxisCount: 3,
         shrinkWrap: true,

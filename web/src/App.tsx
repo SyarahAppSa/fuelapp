@@ -13,6 +13,7 @@ import Users from './pages/Users'
 import Meters from './pages/Meters'
 import Attendance from './pages/Attendance'
 import FillReports from './pages/FillReports'
+import LoadingDocs from './pages/LoadingDocs'
 import Custody from './pages/Custody'
 import PartView from './pages/PartView'
 import TruckFile from './pages/TruckFile'
@@ -146,6 +147,7 @@ function Layout() {
     { to: '/dispatch', label: 'لوحة التوزيع', show: can(me, 'Ops') },
     { to: '/trips', label: 'الرحلات', show: can(me, 'Ops') },
     { to: '/fill-reports', label: 'تقارير التعبئة', show: can(me, 'FillReports') },
+    { to: '/loading-docs', label: 'توثيق التعبئة', show: can(me, 'FillReports') },
     { to: '/fill-report', label: 'تقرير الكميات والعمليات', show: can(me, 'Moves') },
     { to: '/attendance', label: 'الحضور والانصراف', show: true },
     { to: '/custody', label: 'العُهد وقطع الغيار', show: can(me, 'Custody') },
@@ -161,7 +163,7 @@ function Layout() {
     <div className="app">
       <aside className="side" aria-label="القائمة الرئيسية">
         <div className="side-brand"><img src="/logo_mark.png" alt="" /><div><b>فيول آب</b><small>FULL APP</small></div></div>
-        <nav>{links.filter(l => l.show).map(l => <NavLink key={l.to} to={l.to} end={!['/custody', '/orders', '/documents', '/fill-reports'].includes(l.to)}>{l.label}</NavLink>)}</nav>
+        <nav>{links.filter(l => l.show).map(l => <NavLink key={l.to} to={l.to} end={!['/custody', '/orders', '/documents', '/fill-reports', '/loading-docs'].includes(l.to)}>{l.label}</NavLink>)}</nav>
       </aside>
       <div className="shell">
         <header className="topbar">
@@ -179,6 +181,8 @@ function Layout() {
           <Route path="/attendance" element={<Attendance />} />
           <Route path="/fill-reports" element={<FillReports />} />
           <Route path="/fill-reports/:id" element={<FillReports />} />
+          <Route path="/loading-docs" element={<LoadingDocs />} />
+          <Route path="/loading-docs/:id" element={<LoadingDocs />} />
           <Route path="/orders" element={<Orders />} />
           <Route path="/orders/:id" element={<OrderHub />} />
           <Route path="/dispatch" element={<Dispatch />} />

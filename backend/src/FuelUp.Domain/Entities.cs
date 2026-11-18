@@ -630,6 +630,8 @@ public class FillReport : Entity
     public UnloadOutcome Outcome { get; set; } = UnloadOutcome.Full;
     public string? OutcomeReason { get; set; }
     public string? TankState { get; set; }          // "فارغ" or what actually remained
+    /// <summary>«رقم سند التحميل / فاتورة المحطة» typed by the driver after filling (optional; the trip's loading document is the fallback).</summary>
+    public string? LoadingDocNo { get; set; }
 
     // result and review
     public DateTimeOffset? SubmittedAt { get; set; }
@@ -638,6 +640,21 @@ public class FillReport : Entity
     public DateTimeOffset? ReviewedAt { get; set; }
     public string? ReviewNote { get; set; }
     public decimal? DeliveredQty => MeterBefore is { } b && MeterAfter is { } a && a >= b ? a - b : null;
+}
+
+/// <summary>
+/// «طلب إعادة التصوير»: a supervisor asks the driver to photograph one slot of a fill report again, with a note.
+/// While open, the driver may upload that slot even if the report was already sent or approved; the upload resolves it.
+/// </summary>
+public class RetakeRequest : Entity
+{
+    public Guid ReportId { get; set; }
+    public string Kind { get; set; } = "";
+    public string Note { get; set; } = "";
+    public Guid RequestedBy { get; set; }
+    public DateTimeOffset RequestedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset? ResolvedAt { get; set; }
+    public Guid? ResolvedAttachmentId { get; set; }
 }
 
 // ---------- customer orders (طلبات العملاء) ----------

@@ -176,3 +176,25 @@ tr.picked td { background: var(--brand-soft) !important }
 .bell-list { position: absolute; top: calc(100% + 6px); inset-inline-end: 0; width: min(420px, 92vw); max-height: 70vh; overflow-y: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); z-index: 30 }
 .bell-item { display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: start; padding: 10px 12px; border: 0; border-bottom: 1px solid var(--line); background: none; cursor: pointer }
 .bell-item:disabled { cursor: default } .bell-item:not(:disabled):hover { background: var(--surface-2) } .bell-item.unread { background: var(--info-soft) }
+
+/* «توثيق التعبئة»: totals as filters, before/after thumbnails side by side, photo cards with capture facts and retake requests */
+.ld-stats .stat.on { box-shadow: var(--shadow), inset 0 0 0 2px var(--brand) }
+.ld-stats .stat.warn .stat-ic { background: var(--warn-soft); color: var(--warn) } .ld-stats .stat.crit .stat-ic { background: var(--crit-soft); color: var(--crit) }
+.ld-stats .stat.warn.on { box-shadow: var(--shadow), inset 0 0 0 2px var(--warn) } .ld-stats .stat.crit.on { box-shadow: var(--shadow), inset 0 0 0 2px var(--crit) }
+.ld-pair { display: inline-flex; gap: 6px }
+.ld-mini { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; width: 64px }
+.ld-mini img, .ld-mini i { width: 64px; height: 48px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); display: grid; place-items: center; font-style: normal; background: var(--surface-2); color: var(--ink-3) }
+.ld-mini.none i { border-style: dashed; color: var(--crit) } .ld-mini small { font-size: 11px; color: var(--ink-3) }
+.ld-reasons { margin: 4px 0 0; padding-inline-start: 16px; font-size: 12px; color: var(--crit); white-space: normal; max-width: 320px }
+.ld-photos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding: 14px; align-items: start }
+@media (max-width: 1000px) { .ld-photos { grid-template-columns: 1fr } }
+.ld-photo { margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface) }
+.ld-photo.retake { box-shadow: inset 0 0 0 2px var(--warn) }
+.ld-photo-h { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px }
+.ld-meta { display: grid; gap: 4px; margin-top: 8px; font-size: 13px }
+.ld-open { margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: var(--warn-soft); color: var(--warn); font-weight: 700; font-size: 13px }
+.ld-ask { margin-top: 8px; display: grid; gap: 6px } .ld-ask textarea { width: 100% }
+.ld-vthumb { display: block; width: 72px; height: 54px; padding: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface-2); cursor: zoom-in }
+.ld-vthumb img { width: 100%; height: 100%; object-fit: cover }
+.src-Aramco { background: var(--info-soft); color: var(--info) } .src-Station { background: var(--ok-soft); color: var(--ok) } .src-MaysanYard { background: var(--brand-soft); color: var(--brand) }
+.lightbox-cap .btn { margin-inline-start: 8px }

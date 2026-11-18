@@ -13,8 +13,9 @@ public record StartFillReport(Guid TripId);
 public record StageInput(
     [Range(typeof(decimal), "0", "200000")] decimal? LoadedQty, [StringLength(50)] string? MeterSerial,
     [Range(typeof(decimal), "0", "999999999")] decimal? MeterBefore, [Range(typeof(decimal), "0", "999999999")] decimal? MeterAfter,
-    [StringLength(60)] string? TankState, UnloadOutcome? Outcome, [StringLength(1000)] string? OutcomeReason, DateTimeOffset? At);
+    [StringLength(60)] string? TankState, UnloadOutcome? Outcome, [StringLength(1000)] string? OutcomeReason, DateTimeOffset? At, [StringLength(60)] string? LoadingDocNo = null);
 public record ReviewInput([StringLength(1000)] string? Note);
+public record RetakeInput([Required, StringLength(40)] string Kind, [Required, StringLength(500, MinimumLength = 3)] string Note);
 public record FieldEdit([Required, RegularExpression("^(loadedQty|meterBefore|meterAfter|secretMeterSerial|tankState)$")] string Field,
     [Required, StringLength(60)] string Value, [Required, StringLength(500, MinimumLength = 3)] string Reason);
 
@@ -35,6 +36,13 @@ public class FillReportsController(FuelUpDb db, ActorAccessor actor, AuditWriter
         ("tank-post-unload", "post-unload", "الصهريج بعد التفريغ", "صوّر الصهريج بعد التفريغ"),
         ("meter-after", "post-unload", "العداد السري بعد التفريغ", "صوّر قراءة العداد بعد التفريغ"),
     ];
+    /// <summary>Optional photo slots: never required, never in the missing list. «سند التحميل»: the Aramco loading document or the station invoice.</summary>
+    public static readonly (string Kind, string Stage, string Label, string Missing)[] OptionalSlots =
+    [
+        (LoadingDocRules.LoadingDoc, "post-fill", "سند التحميل", "صوّر سند التحميل أو فاتورة المحطة"),
+    ];
+    public static IEnumerable<(string Kind, string Stage, string Label, string Missing)> AllSlots => Slots.Concat(OptionalSlots);
+    public static string SlotLabel(string kind) => AllSlots.FirstOrDefault(s => s.Kind == kind).Label ?? kind;
     private static readonly string[] Stages = ["pre-fill", "post-fill", "arrival", "post-unload"];
     private const long MaxBytes = 10 * 1024 * 1024;
 
@@ -53,6 +61,8 @@ public class FillReportsController(FuelUpDb db, ActorAccessor actor, AuditWriter
         var reports = await db.FillReports.Where(r => ids.Contains(r.TripId)).ToDictionaryAsync(r => r.TripId);
         var oids = list.Where(t => t.OrderId != null).Select(t => t.OrderId!.Value).Distinct().ToList();
         var orders = await db.Orders.Where(o => oids.Contains(o.Id)).ToDictionaryAsync(o => o.Id, o => new { o.No, o.CustomerRef });
+        var rids = reports.Values.Select(r => r.Id).ToList();
+        var open = (await db.RetakeRequests.Where(x => rids.Contains(x.ReportId) && x.ResolvedAt == null).OrderBy(x => x.RequestedAt).ToListAsync()).ToLookup(x => x.ReportId);
         return Ok(list.Select(t =>
         {
             var r = reports.GetValueOrDefault(t.Id);
@@ -61,7 +71,11 @@ public class FillReportsController(FuelUpDb db, ActorAccessor actor, AuditWriter
             {
                 tripId = t.Id, tripNo = t.No, orderNo = o?.No, customerRef = o?.CustomerRef, plate = t.Snapshot?.Plate, customer = t.Snapshot?.CustomerName, site = t.Snapshot?.Site, qtyRequested = t.QtyRequested,
                 product = t.Product, loadingSite = t.Snapshot?.StationName, tripStatus = t.Status.ToString(),
-                report = r is null ? null : new { r.Id, r.No, status = r.Status, stagesDone = StagesDone(r), r.ReviewNote },
+                report = r is null ? null : new
+                {
+                    r.Id, r.No, status = r.Status, stagesDone = StagesDone(r), r.ReviewNote,
+                    retakes = open[r.Id].Select(x => new { x.Id, x.Kind, label = SlotLabel(x.Kind), x.Note, x.RequestedAt }),
+                },
             };
         }));
     }
@@ -109,8 +123,11 @@ public class FillReportsController(FuelUpDb db, ActorAccessor actor, AuditWriter
         if (clientId == Guid.Empty) throw new DomainException("معرّف الصورة مطلوب.");
         var dup = await db.Attachments.FirstOrDefaultAsync(x => x.OwnerId == id && x.ClientId == clientId);
         if (dup != null) return Ok(new { dup.Id, dup.Kind, duplicate = true });
-        if (rep.Status is not (FillReportStatus.Draft or FillReportStatus.Returned)) throw new DomainException("أُرسل التقرير؛ لا يمكن تغيير صوره إلا إذا أعاده فريق العمليات.");
-        var slot = Slots.FirstOrDefault(s => s.Kind == kind);
+        // an open «طلب إعادة التصوير» unlocks that one slot, whatever the report's status; everything else stays locked after sending
+        var retakes = await db.RetakeRequests.Where(x => x.ReportId == id && x.Kind == kind && x.ResolvedAt == null).ToListAsync();
+        if (rep.Status is not (FillReportStatus.Draft or FillReportStatus.Returned) && retakes.Count == 0)
+            throw new DomainException("أُرسل التقرير؛ لا يمكن تغيير صوره إلا إذا أعاده فريق العمليات أو طلب إعادة تصوير هذه الصورة.");
+        var slot = AllSlots.FirstOrDefault(s => s.Kind == kind);
         if (slot.Kind is null) throw new DomainException("خانة الصورة غير معروفة.");
         if (file.Length == 0 || file.Length > MaxBytes) throw new DomainException("حجم الصورة يجب ألا يتجاوز 10 ميجابايت.");
         await using var ms = new MemoryStream(); await file.CopyToAsync(ms, HttpContext.RequestAborted);
@@ -129,6 +146,12 @@ public class FillReportsController(FuelUpDb db, ActorAccessor actor, AuditWriter
             ByUserId = a.UserId, ClientId = clientId,
         };
         db.Attachments.Add(att);
+        foreach (var rq in retakes)
+        {
+            (rq.ResolvedAt, rq.ResolvedAttachmentId) = (att.UploadedAt, att.Id);
+            audit.Write(a, "fillreport", rep.Id, "إعادة تصوير بطلب المشرف", $"{slot.Label} — {rq.Note}");
+            db.Notifications.Add(new Notification { UserId = rq.RequestedBy, Text = $"أعاد السائق {rep.DriverName} تصوير «{slot.Label}» في التقرير {rep.No} (الرحلة {rep.TripNo})", Ref = $"/loading-docs/{rep.Id}", At = att.UploadedAt });
+        }
         try { await db.SaveChangesAsync(); }
         catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: "23505" })
         {
@@ -163,6 +186,7 @@ public class FillReportsController(FuelUpDb db, ActorAccessor actor, AuditWriter
                 var qty = i.LoadedQty ?? rep.LoadedQty;
                 if (qty is not > 0) throw new DomainException("أدخل الكمية المحمّلة باللتر.");
                 if (i.LoadedQty is { } q && q != rep.LoadedQty) { rep.LoadedQty = q; rep.LoadedFromTrip = false; }
+                if (!string.IsNullOrWhiteSpace(i.LoadingDocNo)) rep.LoadingDocNo = i.LoadingDocNo.Trim();
                 rep.PostFillAt = at; break;
             case "arrival":
                 Need("tank-arrival"); Need("meter-before");
@@ -218,8 +242,8 @@ public class FillReportsController(FuelUpDb db, ActorAccessor actor, AuditWriter
         var a = await actor.GetAsync(); a.Require(Section.FillReports, PermissionLevel.View);
         var query = db.FillReports.AsQueryable();
         if (status is { } st) query = query.Where(x => x.Status == st);
-        if (from is { } f) { var fs = new DateTimeOffset(f.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(3)); query = query.Where(x => x.StartedAt >= fs); }
-        if (to is { } t2) { var te = new DateTimeOffset(t2.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(3)).AddDays(1); query = query.Where(x => x.StartedAt < te); }
+        if (from is { } f) { var fs = new DateTimeOffset(f.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(3)).ToUniversalTime(); query = query.Where(x => x.StartedAt >= fs); }
+        if (to is { } t2) { var te = new DateTimeOffset(t2.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(3)).AddDays(1).ToUniversalTime(); query = query.Where(x => x.StartedAt < te); }
         if (!string.IsNullOrWhiteSpace(q))
         {
             var like = "%" + q.Trim().Replace("%", "").Replace("_", "") + "%";
@@ -301,6 +325,25 @@ public class FillReportsController(FuelUpDb db, ActorAccessor actor, AuditWriter
         return Ok(await Detail(a, rep));
     }
 
+    /// <summary>«طلب إعادة التصوير» on one photo slot, with a note the driver sees on that slot in the app.</summary>
+    [HttpPost("{id:guid}/retakes")]
+    public async Task<IActionResult> RequestRetake(Guid id, RetakeInput i)
+    {
+        var a = await actor.GetAsync(); a.Require(Section.FillReports, PermissionLevel.Edit);
+        var rep = await Get(id);
+        var slot = AllSlots.FirstOrDefault(s => s.Kind == i.Kind);
+        if (slot.Kind is null) throw new DomainException("خانة الصورة غير معروفة.");
+        if (string.IsNullOrWhiteSpace(i.Note) || i.Note.Trim().Length < 3) throw new DomainException("اكتب ما المطلوب في الصورة الجديدة.");
+        if (await db.RetakeRequests.AnyAsync(x => x.ReportId == id && x.Kind == i.Kind && x.ResolvedAt == null)) throw new DomainException("يوجد طلب إعادة تصوير مفتوح لهذه الصورة.");
+        var rq = new RetakeRequest { ReportId = id, Kind = i.Kind, Note = i.Note.Trim(), RequestedBy = a.UserId, RequestedAt = DateTimeOffset.UtcNow };
+        db.RetakeRequests.Add(rq);
+        audit.Write(a, "fillreport", rep.Id, "طلب إعادة التصوير", $"{slot.Label} — {rq.Note}");
+        audit.Notify(rep.DriverId, $"طلب إعادة تصوير «{slot.Label}» في تقرير التعبئة {rep.No} (الرحلة {rep.TripNo}): {rq.Note}", rep.No);
+        try { await db.SaveChangesAsync(); }
+        catch (DbUpdateException e) when (e.InnerException is PostgresException { SqlState: "23505" }) { throw new DomainException("يوجد طلب إعادة تصوير مفتوح لهذه الصورة."); }
+        return Ok(new { rq.Id, rq.Kind, label = slot.Label, rq.Note, rq.RequestedAt });
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────────────────────────────────────────
 
     private async Task<FillReport> Get(Guid id) => await db.FillReports.FirstOrDefaultAsync(x => x.Id == id) ?? throw new NotFoundException("التقرير");
@@ -352,6 +395,10 @@ public class FillReportsController(FuelUpDb db, ActorAccessor actor, AuditWriter
         var history = a.Can(Section.FillReports) ? await db.Audit.Where(x => x.Entity == "fillreport" && x.EntityId == r.Id).OrderBy(x => x.Id).ToListAsync() : [];
         var names = history.Count > 0 ? await db.Users.Select(u => new { u.Id, u.DisplayName }).ToDictionaryAsync(u => u.Id, u => u.DisplayName) : [];
         var order = await db.Trips.Where(t => t.Id == r.TripId && t.OrderId != null).Join(db.Orders, t => t.OrderId, o => o.Id, (t, o) => new { o.Id, o.No, o.CustomerRef }).FirstOrDefaultAsync();
+        var open = await db.RetakeRequests.Where(x => x.ReportId == r.Id && x.ResolvedAt == null).OrderBy(x => x.RequestedAt).ToListAsync();
+        object PhotoOf((string Kind, string Stage, string Label, string Missing) s) => latest.TryGetValue(s.Kind, out var p)
+            ? new { kind = s.Kind, stage = s.Stage, label = s.Label, id = (Guid?)p.Id, p.CapturedAt, p.UploadedAt, p.Lat, p.Lng, p.LocationNote, p.FromGallery, retakes = photos.Count(x => x.Kind == s.Kind) - 1 }
+            : new { kind = s.Kind, stage = s.Stage, label = s.Label, id = (Guid?)null, CapturedAt = (DateTimeOffset?)null, UploadedAt = DateTimeOffset.MinValue, Lat = (double?)null, Lng = (double?)null, LocationNote = (string?)null, FromGallery = false, retakes = 0 };
         return new
         {
             r.Id, r.No, r.TripId, r.TripNo, orderId = order?.Id, orderNo = order?.No, customerRef = order?.CustomerRef, status = r.Status, r.StartedAt, r.SubmittedAt,
@@ -365,9 +412,10 @@ public class FillReportsController(FuelUpDb db, ActorAccessor actor, AuditWriter
                 postUnload = new { done = r.UnloadedAt != null, at = r.UnloadedAt, r.MeterAfter, outcome = r.Outcome, r.OutcomeReason, r.TankState },
             },
             quantities = new { requested = r.QtyRequested, loaded = r.LoadedQty, delivered = r.DeliveredQty, difference = Diff(r), allowed = tol.For(r.LoadedQty ?? 0) },
-            photos = Slots.Select(s => latest.TryGetValue(s.Kind, out var p)
-                ? new { kind = s.Kind, stage = s.Stage, label = s.Label, id = (Guid?)p.Id, p.CapturedAt, p.UploadedAt, p.Lat, p.Lng, p.LocationNote, p.FromGallery, retakes = photos.Count(x => x.Kind == s.Kind) - 1 }
-                : new { kind = s.Kind, stage = s.Stage, label = s.Label, id = (Guid?)null, CapturedAt = (DateTimeOffset?)null, UploadedAt = DateTimeOffset.MinValue, Lat = (double?)null, Lng = (double?)null, LocationNote = (string?)null, FromGallery = false, retakes = 0 }),
+            photos = Slots.Select(PhotoOf),
+            optionalPhotos = OptionalSlots.Select(PhotoOf),
+            r.LoadingDocNo,
+            retakeRequests = open.Select(x => new { x.Id, x.Kind, label = SlotLabel(x.Kind), x.Note, x.RequestedAt }),
             missing = Slots.Where(s => !latest.ContainsKey(s.Kind) && !(s.Stage == "post-unload" && r.Outcome == UnloadOutcome.Failed)).Select(s => s.Missing),
             r.ReviewReasons, r.ReviewNote, r.ReviewedAt, reviewedBy = r.ReviewedBy is { } rb ? names.GetValueOrDefault(rb) : null,
             history = history.Select(h => new { h.At, h.Action, h.Detail, h.OldValue, h.NewValue, by = h.UserId is { } u ? names.GetValueOrDefault(u) : null }),

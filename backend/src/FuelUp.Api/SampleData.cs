@@ -27,6 +27,7 @@ public static class SampleData
             await SampleCustody.RunAsync(db, log);   // added later: runs once on databases that already have the sample orders
             await SampleFillReports.RunAsync(db, cfg, log);
             await SampleOrders.RunAsync(db, log);
+            await SampleLoadingDocs.RunAsync(db, cfg, log);
             return;
         }
         var password = cfg["Seed:SamplePassword"];
@@ -182,6 +183,7 @@ public static class SampleData
         await SampleCustody.RunAsync(db, log);
         await SampleFillReports.RunAsync(db, cfg, log);
         await SampleOrders.RunAsync(db, log);
+        await SampleLoadingDocs.RunAsync(db, cfg, log);
         log.LogWarning("Sample data loaded: {Trips} orders, {Drivers} drivers, {Vehicles} vehicles. Driver accounts driver01–driver10 and supervisor1 use Seed__SamplePassword.", plans.Count, drivers.Length, vehicles.Length);
     }
 

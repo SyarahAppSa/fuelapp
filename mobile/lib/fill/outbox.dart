@@ -23,6 +23,12 @@ const slots = [
   Slot('tank-post-unload', 'post-unload', 'الصهريج بعد التفريغ', 'صوّر الصهريج بعد التفريغ'),
   Slot('meter-after', 'post-unload', 'العداد السري بعد التفريغ', 'صوّر قراءة العداد بعد التفريغ', meter: true),
 ];
+/// Optional slots: never required, never in the missing list (server: FillReportsController.OptionalSlots).
+const optionalSlots = [
+  Slot('loading-doc', 'post-fill', 'سند التحميل', 'صوّر سند التحميل أو فاتورة المحطة'),
+];
+const allSlots = [...slots, ...optionalSlots];
+String slotLabel(String kind) => allSlots.where((s) => s.kind == kind).firstOrNull?.label ?? kind;
 const stages = ['pre-fill', 'post-fill', 'arrival', 'post-unload'];
 const stageTitles = {'pre-fill': 'قبل التعبئة', 'post-fill': 'بعد التعبئة', 'arrival': 'الوصول', 'post-unload': 'بعد التفريغ'};
 
@@ -67,6 +73,9 @@ class LocalReport {
 
   String get status => server?['status'] as String? ?? 'Draft';
   bool get locked => status == 'Submitted' || status == 'NeedsReview' || status == 'Approved';
+  /// Open «طلب إعادة التصوير» from the supervisor: that slot can be photographed again even when the report is locked.
+  List<Map<String, dynamic>> get retakes => ((server?['retakeRequests'] as List?) ?? []).cast<Map>().map((x) => x.cast<String, dynamic>()).toList();
+  Map<String, dynamic>? retakeFor(String kind) => retakes.where((x) => x['kind'] == kind).firstOrNull;
 
   Map<String, dynamic> toJson() => {
         'tripId': tripId, 'reportId': reportId, 'server': server, 'header': header, 'photos': photos.values.map((p) => p.toJson()).toList(),
@@ -288,6 +297,7 @@ class FillOutbox extends ChangeNotifier {
     fill('meterBefore', ar['meterBefore']);
     fill('meterAfter', pu['meterAfter']);
     fill('tankState', pu['tankState']);
+    fill('loadingDocNo', s['loadingDocNo']);
     if (r.status == 'Returned') r.submitted = jobs.any((j) => j.tripId == r.tripId && j.type == 'submit');
   }
 
@@ -354,6 +364,11 @@ class FillOutbox extends ChangeNotifier {
         final res = await api.uploadFillPhoto(id, bytes, kind: p.kind, clientId: p.clientId, capturedAt: p.capturedAt, lat: p.lat, lng: p.lng, locationNote: p.locationNote);
         p.synced = true;
         p.serverId = res['id'] as String?;
+        if (r.retakeFor(p.kind) != null) {
+          // a requested retake: the server resolved the request; take its new state (and free the phone's copy of a sent report)
+          r.server = (await api.get('/api/fill-reports/$id') as Map).cast<String, dynamic>();
+          if (r.locked) await DeviceStore.delete('${p.clientId}.jpg');
+        }
         return;
       case 'stage':
         r.server = (await api.post('/api/fill-reports/$id/stages/${j.stage}', j.body) as Map).cast<String, dynamic>();
